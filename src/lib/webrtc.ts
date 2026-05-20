@@ -90,7 +90,11 @@ export class WhepClient {
 
       this.pc.onicecandidate = (_e) => { /* ICE candidate events — no logging needed */ }
 
-      // recvonly transceivers — server decides what to send
+      // Two audio transceivers so the offer has two audio m-lines — required for
+      // WHEP endpoints with num_audio_tracks:2 (e.g. PGM + MON bus). If the server
+      // only sends one audio track, the second transceiver is set to inactive in the
+      // answer and no second ontrack event fires.
+      this.pc.addTransceiver('audio', { direction: 'recvonly' })
       this.pc.addTransceiver('audio', { direction: 'recvonly' })
       this.pc.addTransceiver('video', { direction: 'recvonly' })
 

@@ -1075,10 +1075,14 @@ function NoContent({ label }: { label: string }) {
 
 type AudioTab = 'main' | 'aux' | 'groups'
 
-export function AudioPanel({ send }: { send: SendFn }) {
+export function AudioPanel({ send, numAuxBuses = 2, numGroups = 2 }: { send: SendFn; numAuxBuses?: number; numGroups?: number }) {
   const elements = useAudioStore((s) => s.elements)
   const pgmInput = useProductionStore((s) => s.pgmInput)
   const pvwInput = useProductionStore((s) => s.pvwInput)
+
+  // Derive bus index arrays from counts
+  const auxBuses = Array.from({ length: numAuxBuses }, (_, i) => i + 1)
+  const grpBuses = Array.from({ length: numGroups }, (_, i) => i + 1)
 
   const [activeTab, setActiveTab] = useState<AudioTab>('main')
   // MAIN tab — per-section collapsed state; all expanded by default
@@ -1095,8 +1099,8 @@ export function AudioPanel({ send }: { send: SendFn }) {
 
   const TABS: Array<{ id: AudioTab; label: string; color: string }> = [
     { id: 'main',   label: 'MAIN',   color: C_MAIN.hex },
-    { id: 'aux',    label: 'AUX',    color: C_AUX.hex },
-    { id: 'groups', label: 'GRP',    color: C_GRP.hex },
+    ...(auxBuses.length > 0 ? [{ id: 'aux' as AudioTab,    label: 'AUX', color: C_AUX.hex }] : []),
+    ...(grpBuses.length > 0 ? [{ id: 'groups' as AudioTab, label: 'GRP', color: C_GRP.hex }] : []),
   ]
 
   const handleTabChange = (id: AudioTab) => {
@@ -1160,12 +1164,17 @@ export function AudioPanel({ send }: { send: SendFn }) {
               )}
 
               {/* GROUPS section */}
-              <SectionBar label="GRP" collapsed={collapsed.groups} onToggle={() => toggleSection('groups')} color={C_GRP.hex} />
-              {!collapsed.groups && (
-                <div className="flex items-stretch shrink-0">
-                  <GrpMasterStrip grpBus={1} label="GRP 1" send={send} />
-                  <GrpMasterStrip grpBus={2} label="GRP 2" send={send} />
-                </div>
+              {grpBuses.length > 0 && (
+                <>
+                  <SectionBar label="GRP" collapsed={collapsed.groups} onToggle={() => toggleSection('groups')} color={C_GRP.hex} />
+                  {!collapsed.groups && (
+                    <div className="flex items-stretch shrink-0">
+                      {grpBuses.map((bus) => (
+                        <GrpMasterStrip key={bus} grpBus={bus} label={`GRP ${bus}`} send={send} />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
 
               {/* IN section */}
@@ -1200,12 +1209,15 @@ export function AudioPanel({ send }: { send: SendFn }) {
 
           {/* ── AUX tab ──────────────────────────────────────────────────── */}
           {activeTab === 'aux' && (
-            selectedAux === null ? (
-              // List view — MAIN output + both AUX masters (headers clickable)
+            auxBuses.length === 0 ? (
+              <NoContent label="NO AUX BUSES CONFIGURED" />
+            ) : selectedAux === null ? (
+              // List view — MAIN output + all AUX masters (headers clickable)
               <div className="flex items-stretch">
                 {mainElement && <ChannelStrip elementId="main" label="MAIN" send={send} showAfv={false} showEbu busColor={C_MAIN} />}
-                <AuxMasterStrip auxBus={1} label="AUX 1" send={send} onSelect={() => setSelectedAux(1)} />
-                <AuxMasterStrip auxBus={2} label="AUX 2" send={send} onSelect={() => setSelectedAux(2)} />
+                {auxBuses.map((bus) => (
+                  <AuxMasterStrip key={bus} auxBus={bus} label={`AUX ${bus}`} send={send} onSelect={() => setSelectedAux(bus)} />
+                ))}
               </div>
             ) : (
               // Detail view — MAIN + pinned AUX master + per-channel sends
@@ -1240,11 +1252,14 @@ export function AudioPanel({ send }: { send: SendFn }) {
 
           {/* ── GROUPS tab ───────────────────────────────────────────────── */}
           {activeTab === 'groups' && (
-            selectedGrp === null ? (
-              // List view — both GRP masters, headers are clickable
+            grpBuses.length === 0 ? (
+              <NoContent label="NO GROUP BUSES CONFIGURED" />
+            ) : selectedGrp === null ? (
+              // List view — all GRP masters, headers are clickable
               <div className="flex items-stretch">
-                <GrpMasterStrip grpBus={1} label="GRP 1" send={send} onSelect={() => setSelectedGrp(1)} />
-                <GrpMasterStrip grpBus={2} label="GRP 2" send={send} onSelect={() => setSelectedGrp(2)} />
+                {grpBuses.map((bus) => (
+                  <GrpMasterStrip key={bus} grpBus={bus} label={`GRP ${bus}`} send={send} onSelect={() => setSelectedGrp(bus)} />
+                ))}
               </div>
             ) : (
               // Detail view — per-channel sends + pinned master

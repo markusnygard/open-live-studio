@@ -785,7 +785,11 @@ export function ControllerPage() {
                 <SectionLabel icon={<AudioIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/audio?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('audio')} actions={
                   <button type="button" onClick={() => setAudioOptionsOpen(true)} title="Audio options" className="cursor-pointer hover:text-[--color-text-primary] transition-colors"><GearIcon /></button>
                 }>Audio</SectionLabel>
-                <AudioPanel send={send} />
+                <AudioPanel
+                  send={send}
+                  numAuxBuses={activeProduction?.values?.num_aux_buses !== undefined ? parseInt(String(activeProduction.values.num_aux_buses), 10) : 2}
+                  numGroups={activeProduction?.values?.num_groups !== undefined ? parseInt(String(activeProduction.values.num_groups), 10) : 2}
+                />
               </div>
             )}
           </div>
