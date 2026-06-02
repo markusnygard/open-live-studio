@@ -128,8 +128,8 @@ export const VideoTile = forwardRef<VideoTileHandle, VideoTileProps>(function Vi
       {/* Tally indicator + label overlay */}
       <div className="absolute bottom-0 left-0 right-0 px-2 py-1 bg-gradient-to-t from-black/80 to-transparent flex items-end justify-between">
         <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="text-white text-xs font-semibold truncate leading-tight">{label}</span>
-          {sublabel && <span className="text-zinc-400 text-[10px] truncate leading-tight">{sublabel}</span>}
+          <span className="text-white text-xs font-semibold break-words leading-tight">{label}</span>
+          {sublabel && <span className="text-zinc-400 text-[10px] break-words leading-tight">{sublabel}</span>}
         </div>
         <TallyLight state={tally} size="sm" className="ml-2 flex-shrink-0" />
       </div>

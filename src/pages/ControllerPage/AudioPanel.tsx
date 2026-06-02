@@ -1,4 +1,4 @@
-import { Fragment, useRef, useCallback, useState, createContext, useContext } from 'react'
+import { Fragment, useRef, useCallback, useState, useEffect, createContext, useContext } from 'react'
 import { useAudioStore } from '@/store/audio.store'
 import { useProductionStore } from '@/store/production.store'
 import { cn } from '@/lib/cn'
@@ -555,7 +555,7 @@ function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false
                 width: faderContainerH, height: FADER_W,
                 left: -(faderContainerH - FADER_W) / 2,
                 top:  (faderContainerH - FADER_W) / 2,
-                cursor: mode === 'off' ? 'not-allowed' : 'pointer',
+                cursor: 'pointer',
                 zIndex: 2,
               }}
             />
@@ -607,11 +607,12 @@ function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false
 // Shown in AUX tabs. Fader = send level for this channel to the AUX bus.
 // ON/OFF routes or silences the send without losing the fader position.
 
-function AuxChannelStrip({ elementId, label, auxBus, send }: {
+function AuxChannelStrip({ elementId, label, auxBus, send, busPre }: {
   elementId: string
   label: string
   auxBus: number
   send: SendFn
+  busPre?: boolean
 }) {
   const { faderContainerH } = useFaderDims()
   const level          = useAudioStore((s) => s.auxSend[elementId]?.[auxBus] ?? 0)
@@ -620,17 +621,22 @@ function AuxChannelStrip({ elementId, label, auxBus, send }: {
   const setAuxSend     = useAudioStore((s) => s.setAuxSend)
   const setAuxEnabled  = useAudioStore((s) => s.setAuxSendEnabled)
 
-  const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const throttleRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const enabledRef   = useRef(enabled)
+  const preRef       = useRef(pre)
+  useEffect(() => { enabledRef.current = enabled }, [enabled])
+  useEffect(() => { preRef.current = pre }, [pre])
 
   const handleChange = useCallback((faderPos: number) => {
-    const newLevel = faderToVolume(faderPos)
+    const pos = faderPos >= 0.995 ? 1 : faderPos <= 0.005 ? 0 : faderPos
+    const newLevel = faderToVolume(pos)
     setAuxSend(elementId, auxBus, newLevel)
     if (throttleRef.current !== null) clearTimeout(throttleRef.current)
     throttleRef.current = setTimeout(() => {
       throttleRef.current = null
-      send({ type: 'AUX_SEND_SET', elementId, auxBus, level: newLevel, enabled, pre })
+      send({ type: 'AUX_SEND_SET', elementId, auxBus, level: newLevel, enabled: enabledRef.current, pre: preRef.current })
     }, 80)
-  }, [elementId, auxBus, enabled, pre, send, setAuxSend])
+  }, [elementId, auxBus, send, setAuxSend])
 
   const handleOnClick = useCallback(() => {
     const next = !enabled
@@ -668,6 +674,14 @@ function AuxChannelStrip({ elementId, label, auxBus, send }: {
             <PeakReadout elementId={elementId} />
           </div>
           <div className="relative shrink-0" style={{ width: FADER_W, height: faderContainerH }}>
+            {busPre !== undefined && (
+              <span
+                className="absolute text-[7px] font-bold tracking-widest uppercase leading-none pointer-events-none"
+                style={{ top: 0, left: '50%', transform: 'translateX(-50%)', color: busPre ? '#f97316' : '#60a5fa' }}
+              >
+                {busPre ? 'PRE' : 'POST'}
+              </span>
+            )}
             <div className="absolute pointer-events-none" style={{ width: 4, height: faderContainerH - THUMB_CSS_W, top: Math.round(THUMB_CSS_W / 2), left: '50%', transform: 'translateX(-50%)', background: '#181818', border: '1px solid #2a2a2a' }} />
             {FADER_TICKS.map(({ pos, db, major, infinity: isInfinity }) => {
               const y = Math.round(THUMB_CSS_W / 2 + (1 - pos) * (faderContainerH - THUMB_CSS_W))
@@ -730,6 +744,8 @@ function AuxMasterStrip({ auxBus, label, send, onSelect }: {
   const meterId         = `aux${auxBus}`
 
   const throttleRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mutedRef    = useRef(muted)
+  useEffect(() => { mutedRef.current = muted }, [muted])
 
   const handleFaderMouseDown = useCallback(() => {
     document.body.classList.add('fader-dragging')
@@ -747,9 +763,9 @@ function AuxMasterStrip({ auxBus, label, send, onSelect }: {
     if (throttleRef.current !== null) clearTimeout(throttleRef.current)
     throttleRef.current = setTimeout(() => {
       throttleRef.current = null
-      send({ type: 'AUX_MASTER_SET', auxBus, volume, muted })
+      send({ type: 'AUX_MASTER_SET', auxBus, volume, muted: mutedRef.current })
     }, 80)
-  }, [auxBus, muted, send, setMasterLevel])
+  }, [auxBus, send, setMasterLevel])
 
   const handleOnClick = useCallback(() => {
     const next = !muted
@@ -1135,7 +1151,7 @@ function NoContent({ label }: { label: string }) {
 
 type AudioTab = string  // 'main' | 'aux-1' | 'aux-2' | …
 
-export function AudioPanel({ send, numAuxBuses = 2, numGroups = 2, showEbuMain = false, faderHeight }: { send: SendFn; numAuxBuses?: number; numGroups?: number; showEbuMain?: boolean; faderHeight?: number }) {
+export function AudioPanel({ send, numAuxBuses = 2, numGroups = 2, showEbuMain = false, faderHeight, auxBusPre }: { send: SendFn; numAuxBuses?: number; numGroups?: number; showEbuMain?: boolean; faderHeight?: number; auxBusPre?: Record<number, boolean> }) {
   const fH = faderHeight ?? FADER_H
   const fCH = fH + THUMB_CSS_W
   const elements = useAudioStore((s) => s.elements)
@@ -1297,6 +1313,7 @@ export function AudioPanel({ send, numAuxBuses = 2, numGroups = 2, showEbuMain =
                         label={el.label}
                         auxBus={activeAuxBus}
                         send={send}
+                        busPre={auxBusPre?.[activeAuxBus]}
                       />
                     ))
                   )}

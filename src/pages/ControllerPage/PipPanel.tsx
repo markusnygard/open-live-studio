@@ -11,6 +11,20 @@ interface PipPanelProps {
 
 const ZONE_COLORS = ['#f97316', '#3b82f6', '#22c55e', '#a855f7', '#ec4899']
 
+const GRID_DIVISIONS = 9
+
+function parsePgmResolution(val: unknown): { w: number; h: number } {
+  if (typeof val === 'string') {
+    const m = val.match(/^(\d+)x(\d+)$/)
+    if (m) return { w: parseInt(m[1]!, 10), h: parseInt(m[2]!, 10) }
+  }
+  return { w: 1280, h: 720 }
+}
+
+function snapToGrid(v: number): number {
+  return Math.round(v * GRID_DIVISIONS) / GRID_DIVISIONS
+}
+
 const HANDLE_POSITIONS: Record<string, React.CSSProperties> = {
   n:  { top: -5, left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' },
   ne: { top: -5, right: -5, cursor: 'ne-resize' },
@@ -39,10 +53,15 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
   const production = useProductionsStore((s) => s.productions.find((p) => p.id === activeProductionId))
   const sources = useSourcesStore((s) => s.sources)
 
+  const pgmResolution = parsePgmResolution(production?.values?.pgm_resolution)
+
   const [editingPipIdx, setEditingPipIdx] = useState(0)
   const [draft, setDraft] = useState<PipConfig>({ bg: null, zones: [] })
   const [activeZoneIdx, setActiveZoneIdx] = useState(0)
   const [editMode, setEditMode] = useState(false)
+  const [snapEnabled, setSnapEnabled] = useState(true)
+  // Local string state for pixel coordinate inputs so mid-edit values aren't stomped
+  const [pxInputs, setPxInputs] = useState<{ x: string; y: string; w: string; h: string } | null>(null)
   const isDirtyRef = useRef(false)
   const applyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -199,6 +218,8 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
   // Drag state
   const canvasRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<DragState | null>(null)
+  const snapRef = useRef(snapEnabled)
+  useEffect(() => { snapRef.current = snapEnabled }, [snapEnabled])
 
   const startDrag = useCallback((e: React.MouseEvent, zoneIdx: number, handle: string | null) => {
     e.stopPropagation()
@@ -225,24 +246,25 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
       const dx = (e.clientX - drag.startX) / rect.width
       const dy = (e.clientY - drag.startY) / rect.height
       const r = drag.startRect
+      const snap = snapRef.current ? snapToGrid : (v: number) => v
       setDraft((prev) => {
         const next = structuredClone(prev)
         const zone = next.zones[drag.zoneIdx]
         if (!zone?.rect) return prev
         if (drag.type === 'move') {
-          zone.rect.x = clamp(r.x + dx, 0, 1 - zone.rect.w)
-          zone.rect.y = clamp(r.y + dy, 0, 1 - zone.rect.h)
+          zone.rect.x = snap(clamp(r.x + dx, 0, 1 - zone.rect.w))
+          zone.rect.y = snap(clamp(r.y + dy, 0, 1 - zone.rect.h))
         } else {
           const h = drag.handle ?? ''
-          if (h.includes('e')) zone.rect.w = clamp(r.w + dx, 0.05, 1 - zone.rect.x)
-          if (h.includes('s')) zone.rect.h = clamp(r.h + dy, 0.05, 1 - zone.rect.y)
+          if (h.includes('e')) zone.rect.w = snap(clamp(r.w + dx, 0.05, 1 - zone.rect.x))
+          if (h.includes('s')) zone.rect.h = snap(clamp(r.h + dy, 0.05, 1 - zone.rect.y))
           if (h.includes('w')) {
-            const newX = clamp(r.x + dx, 0, r.x + r.w - 0.05)
+            const newX = snap(clamp(r.x + dx, 0, r.x + r.w - 0.05))
             zone.rect.w = r.x + r.w - newX
             zone.rect.x = newX
           }
           if (h.includes('n')) {
-            const newY = clamp(r.y + dy, 0, r.y + r.h - 0.05)
+            const newY = snap(clamp(r.y + dy, 0, r.y + r.h - 0.05))
             zone.rect.h = r.y + r.h - newY
             zone.rect.y = newY
           }
@@ -250,6 +272,7 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
         return next
       })
       isDirtyRef.current = true
+      setPxInputs(null)
     }
     const onUp = () => { dragRef.current = null }
     window.addEventListener('mousemove', onMove)
@@ -316,10 +339,12 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
       {editMode ? (
         /* ── EDIT MODE: canvas + zone management ── */
         <div className="flex gap-2">
+          {/* Left column: canvas + pixel inputs */}
+          <div className="flex flex-col shrink-0">
           {/* Zone canvas */}
           <div
             ref={canvasRef}
-            className="relative select-none overflow-hidden shrink-0"
+            className="relative select-none overflow-hidden"
             style={{ width: 420, aspectRatio: '16/9', background: '#111', border: '1px solid #3f3f46' }}
           >
             {draft.zones.map((zone, zIdx) => {
@@ -373,6 +398,13 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
                 </div>
               )
             })}
+            {/* 9×9 grid overlay — thirds are slightly brighter */}
+            {snapEnabled && Array.from({ length: GRID_DIVISIONS - 1 }, (_, i) => i + 1).map((i) => (
+              <div key={`v${i}`} style={{ position: 'absolute', top: 0, bottom: 0, left: `${(i / GRID_DIVISIONS) * 100}%`, width: 1, background: i % 3 === 0 ? 'rgba(6,182,212,0.45)' : 'rgba(6,182,212,0.18)', pointerEvents: 'none' }} />
+            ))}
+            {snapEnabled && Array.from({ length: GRID_DIVISIONS - 1 }, (_, i) => i + 1).map((i) => (
+              <div key={`h${i}`} style={{ position: 'absolute', left: 0, right: 0, top: `${(i / GRID_DIVISIONS) * 100}%`, height: 1, background: i % 3 === 0 ? 'rgba(6,182,212,0.45)' : 'rgba(6,182,212,0.18)', pointerEvents: 'none' }} />
+            ))}
             {draft.bg !== null && (
               <div style={{ position: 'absolute', bottom: 4, left: 4, fontSize: 8, color: '#a1a1aa', background: 'rgba(0,0,0,0.6)', padding: '1px 4px' }}>
                 BG: {(inputSlots[draft.bg]?.name ?? String(draft.bg + 1))}
@@ -384,6 +416,76 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
               </div>
             )}
           </div>
+
+          {/* Pixel coordinate inputs for active zone */}
+          {(() => {
+            const activeZone = draft.zones[activeZoneIdx]
+            const r = activeZone?.rect
+            if (!r) return null
+            const { w: pw, h: ph } = pgmResolution
+            const toPixels = (n: number, dim: number) => Math.round(n * dim)
+            const fromPixels = (px: number, dim: number) => clamp(px / dim, 0, 1)
+            // Derive display values: use local string state while focused, else derive from rect
+            const displayVal = (field: 'x' | 'y' | 'w' | 'h') => {
+              if (pxInputs) return pxInputs[field]
+              const dim = (field === 'x' || field === 'w') ? pw : ph
+              return String(toPixels(r[field], dim))
+            }
+            const commitPxChange = (field: 'x' | 'y' | 'w' | 'h', raw: string) => {
+              const px = parseInt(raw, 10)
+              if (!Number.isFinite(px)) return
+              markDirty()
+              setDraft((prev) => {
+                const next = structuredClone(prev)
+                const zone = next.zones[activeZoneIdx]
+                if (!zone?.rect) return prev
+                const dim = (field === 'x' || field === 'w') ? pw : ph
+                zone.rect[field] = fromPixels(px, dim)
+                if (field === 'x') zone.rect.x = clamp(zone.rect.x, 0, 1 - zone.rect.w)
+                if (field === 'y') zone.rect.y = clamp(zone.rect.y, 0, 1 - zone.rect.h)
+                if (field === 'w') zone.rect.w = clamp(zone.rect.w, 1 / pw, 1 - zone.rect.x)
+                if (field === 'h') zone.rect.h = clamp(zone.rect.h, 1 / ph, 1 - zone.rect.y)
+                return next
+              })
+            }
+            const initPxInputs = () => {
+              setPxInputs({
+                x: String(toPixels(r.x, pw)),
+                y: String(toPixels(r.y, ph)),
+                w: String(toPixels(r.w, pw)),
+                h: String(toPixels(r.h, ph)),
+              })
+            }
+            return (
+              <div className="flex items-end gap-1 mt-1">
+                {(['x', 'y', 'w', 'h'] as const).map((field) => (
+                  <label key={field} className="flex flex-col items-center gap-0.5">
+                    <span className="text-[8px] text-zinc-500 uppercase">{field}</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={displayVal(field)}
+                      onFocus={initPxInputs}
+                      onChange={(e) => setPxInputs((prev) => prev ? { ...prev, [field]: e.target.value } : prev)}
+                      onBlur={(e) => { commitPxChange(field, e.target.value); setPxInputs(null) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { commitPxChange(field, (e.target as HTMLInputElement).value); setPxInputs(null) } }}
+                      className="w-14 bg-zinc-900 border border-zinc-700 text-zinc-200 text-[10px] text-center px-1 py-0.5 focus:outline-none focus:border-zinc-500"
+                    />
+                  </label>
+                ))}
+                <label className="flex flex-col items-center gap-0.5 ml-1">
+                  <span className="text-[8px] text-zinc-500 uppercase">Snap</span>
+                  <input
+                    type="checkbox"
+                    checked={snapEnabled}
+                    onChange={(e) => setSnapEnabled(e.target.checked)}
+                    className="w-[18px] h-[18px] accent-orange-500 cursor-pointer"
+                  />
+                </label>
+              </div>
+            )
+          })()}
+          </div>{/* end left column */}
 
           {/* Right panel: background + zone list */}
           <div className="flex-1 flex flex-col gap-2 min-w-0">

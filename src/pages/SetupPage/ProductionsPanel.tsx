@@ -37,7 +37,8 @@ const selectCls =
 const inputCls =
   'w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:ring-1 focus:ring-[--color-accent]'
 
-const MAX_INPUTS = 10
+const MAX_INPUTS = 16
+const MAX_OUTPUTS = 8
 const MIN_INPUTS = 2
 
 function mixerInput(index: number) { return `video_in_${index}` }
@@ -304,12 +305,39 @@ function ProductionOptionsModal({ production, onClose }: OptionsModalProps) {
     else setProdName(production.name)
   }
 
+  const sourceIds = new Set(sources.map((s) => s.id))
+  const isValidSource = (sourceId: string) => sourceIds.has(sourceId) || sourceId in VIRTUAL_SOURCE_NAMES
+
+  // Sort valid sources by their pad index and compact to contiguous 0-based indices.
+  // Non-contiguous gaps arise when remove+shift backend writes partially fail.
+  const validSources = [...production.sources.filter((s) => isValidSource(s.sourceId))]
+    .sort((a, b) => {
+      const ai = parseInt(/(\d+)$/.exec(a.mixerInput)?.[1] ?? '0', 10)
+      const bi = parseInt(/(\d+)$/.exec(b.mixerInput)?.[1] ?? '0', 10)
+      return ai - bi
+    })
+
   const [assignments, setAssignments] = useState<Record<string, string>>(() =>
-    Object.fromEntries(production.sources.map((s) => [s.mixerInput, s.sourceId]))
+    Object.fromEntries(validSources.map((s, i) => [mixerInput(i), s.sourceId]))
   )
   const [slotCount, setSlotCount] = useState(() =>
-    Math.max(MIN_INPUTS, production.sources.length)
+    Math.max(MIN_INPUTS, validSources.length)
   )
+
+  // On open: remove ghost assignments and fix any non-contiguous pad indices in the DB.
+  useEffect(() => {
+    const ghosts = production.sources.filter((s) => !isValidSource(s.sourceId))
+    for (const ghost of ghosts) void unassignSource(production.id, ghost.mixerInput)
+
+    // Re-assign any sources that moved to a new contiguous pad index
+    validSources.forEach((s, i) => {
+      const compactedPad = mixerInput(i)
+      if (s.mixerInput !== compactedPad) {
+        void assignSource(production.id, { mixerInput: compactedPad, sourceId: s.sourceId })
+        void unassignSource(production.id, s.mixerInput)
+      }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const [gfxAssignments, setGfxAssignments] = useState<Record<string, string>>(() =>
     Object.fromEntries((production.graphicAssignments ?? []).map((g) => [g.dskInput, g.graphicId]))
   )
@@ -503,7 +531,9 @@ function ProductionOptionsModal({ production, onClose }: OptionsModalProps) {
                   {outputList.map((id, i) => (
                     <OutputSlotRow key={i} value={id} usedIds={outputList} takenByOtherIds={[]} canRemove={true} onChange={(newId) => void handleOutputChange(i, newId)} onRemove={() => void handleOutputRemove(i)} />
                   ))}
-                  <button type="button" onClick={() => setOutputList((prev) => [...prev, ''])} className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity">+ New Output</button>
+                  {outputList.length < MAX_OUTPUTS && (
+                    <button type="button" onClick={() => setOutputList((prev) => [...prev, ''])} className="text-xs text-[--color-accent] hover:opacity-80 text-left transition-opacity">+ New Output</button>
+                  )}
                 </div>
               )}
             </div>
@@ -653,18 +683,25 @@ function ConfigFieldGroup({
                 </div>
                 <PropertyField property={prop} value={value} onChange={(v) => onChange(prop.id, v)} />
                 {prop.id === 'num_aux_buses' && Number(values['num_aux_buses'] ?? 0) > 0 && (
-                  <div className="mt-2">
-                    <span className="text-xs text-[--color-text-muted] block mb-1">Aux send mode</span>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input type="checkbox" checked={values['aux_pre_fader'] !== false} onChange={() => onChange('aux_pre_fader', true)} className="accent-orange-500" />
-                        <span className="text-xs text-[--color-text-muted]">Pre</span>
-                      </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                        <input type="checkbox" checked={values['aux_pre_fader'] === false} onChange={() => onChange('aux_pre_fader', false)} className="accent-orange-500" />
-                        <span className="text-xs text-[--color-text-muted]">Post</span>
-                      </label>
-                    </div>
+                  <div className="mt-2 flex flex-col gap-1">
+                    <span className="text-xs text-[--color-text-muted]">Aux send routing</span>
+                    {Array.from({ length: Number(values['num_aux_buses']) }, (_, i) => i + 1).map((bus) => {
+                      const key = `aux${bus}_pre`
+                      const isPre = values[key] !== false
+                      return (
+                        <div key={bus} className="flex items-center gap-3">
+                          <span className="text-xs text-[--color-text-muted] w-10">AUX {bus}</span>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="radio" name={key} checked={isPre} onChange={() => onChange(key, true)} className="accent-orange-500" />
+                            <span className="text-xs text-[--color-text-muted]">Pre</span>
+                          </label>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input type="radio" name={key} checked={!isPre} onChange={() => onChange(key, false)} className="accent-orange-500" />
+                            <span className="text-xs text-[--color-text-muted]">Post</span>
+                          </label>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -684,10 +721,12 @@ function ConfigFieldGroup({
               <span className="text-sm text-[--color-text-primary] font-mono">{display}</span>
               {prop.id === 'num_aux_buses' && Number(value) > 0 && (
                 <div className="flex flex-col gap-0.5 mt-1">
-                  <span className="text-xs text-[--color-text-muted]">Aux send mode</span>
-                  <span className="text-sm text-[--color-text-primary] font-mono">
-                    {values['aux_pre_fader'] === false ? 'Post-fader' : 'Pre-fader'}
-                  </span>
+                  <span className="text-xs text-[--color-text-muted]">Aux send routing</span>
+                  {Array.from({ length: Number(value) }, (_, i) => i + 1).map((bus) => (
+                    <span key={bus} className="text-sm text-[--color-text-primary] font-mono">
+                      AUX {bus}: {values[`aux${bus}_pre`] === false ? 'Post-fader' : 'Pre-fader'}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
@@ -996,7 +1035,8 @@ export function ProductionsPanel() {
           const isActivating = prod.status === 'activating'
           const assignedCount = prod.sources.length
           const airStartMs = prod.airTime ? new Date(prod.airTime).getTime() : null
-          const isOnAir = getProgramMode(airStartMs, now) === 'onair'
+          const programMode = getProgramMode(airStartMs, now)
+          const isOnAir = programMode === 'onair'
 
           return (
             <div
@@ -1024,8 +1064,8 @@ export function ProductionsPanel() {
                     {prod.name}
                   </span>
                   {isActive && isOnAir && (
-                    <span className="shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-red-600 text-white">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse inline-block" />
+                    <span className="shrink-0 inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-widest bg-red-600 text-white leading-none">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse shrink-0" />
                       On Air
                     </span>
                   )}
@@ -1071,7 +1111,7 @@ export function ProductionsPanel() {
                     )
                   })()}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                <div className="flex items-center gap-2 mt-1.5 min-w-0">
                   <span className="text-xs text-[--color-text-muted] truncate">
                     {assignedCount > 0 ? `${assignedCount} ${assignedCount === 1 ? 'source' : 'sources'}` : 'No sources'}
                   </span>
@@ -1262,7 +1302,7 @@ function InlineCopyButton({ label, value, displayUrl }: { label: string; value: 
       type="button"
       onClick={handleCopy}
       title={displayUrl ?? value}
-      className="relative -top-0.5 inline-flex items-center gap-1 shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] border border-[--color-border] text-[--color-text-muted] hover:text-orange-500 hover:border-[--color-accent]/40 transition-colors cursor-pointer"
+      className="inline-flex items-center gap-1 shrink-0 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[--color-surface-raised] border border-[--color-border] text-[--color-text-muted] hover:text-orange-500 hover:border-[--color-accent]/40 transition-colors cursor-pointer"
     >
       {copied ? (
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" aria-hidden="true">

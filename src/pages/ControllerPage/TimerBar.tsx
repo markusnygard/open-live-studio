@@ -104,7 +104,7 @@ export function TimerBar() {
     if (mode === 'scheduled') {
       programDisplay = new Date(programStartMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
       programLabel   = 'SCHED'
-      programColor   = 'text-zinc-500'
+      programColor   = 'text-zinc-400'
     } else if (mode === 'countdown') {
       programDisplay = '-' + formatHMS(Math.ceil(diffMs / 1000))
       programLabel   = 'COUNTDOWN'
@@ -114,10 +114,10 @@ export function TimerBar() {
       programLabel   = 'ON AIR'
       programColor   = 'text-red-400'
     } else {
-      // expired
-      programDisplay = '--:--:--'
-      programLabel   = 'PROGRAM'
-      programColor   = 'text-zinc-600'
+      // expired — show the scheduled wall time so it's not mistaken for "not set"
+      programDisplay = new Date(programStartMs).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+      programLabel   = 'PAST'
+      programColor   = 'text-zinc-500'
     }
   }
 

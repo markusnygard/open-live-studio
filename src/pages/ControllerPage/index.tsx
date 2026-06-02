@@ -24,6 +24,7 @@ import { useOutputsStore } from '@/store/outputs.store'
 import { useAudioStore } from '@/store/audio.store'
 import { useViewerStore } from '@/store/viewer.store'
 import { audioApi, type ApiProduction } from '@/lib/api'
+import { ToastContainer } from '@/components/ui/ToastContainer'
 
 // ─── Panel layout persistence ─────────────────────────────────────────────────
 
@@ -634,15 +635,17 @@ export function ControllerPage() {
     </svg>
   )
 
+  const numPips = activeProduction?.values?.num_pips !== undefined ? parseInt(String(activeProduction.values.num_pips), 10) : 0
+
   const PANEL_ICONS = [
     { key: 'multiviewer', Icon: MultiviewerIcon },
     { key: 'pgm',         Icon: MonitorIcon     },
     { key: 'controller',  Icon: ControllerIcon  },
-    { key: 'pip',         Icon: PipIcon          },
+    ...(numPips > 0 ? [{ key: 'pip', Icon: PipIcon } as const] : []),
     { key: 'audio',       Icon: AudioIcon        },
   ] as const
 
-  const showBottomRow = panels.controller || panels.audio || panels.pip
+  const showBottomRow = panels.controller || panels.audio || (panels.pip && numPips > 0)
 
   return (
     <>
@@ -853,9 +856,11 @@ export function ControllerPage() {
 
         {/* Controller + Audio row */}
         {showBottomRow && (
-          <div className="flex flex-none pt-2 pb-3 gap-0">
+          // min-height keeps controller + pip height stable when audio is hidden.
+          // 300 = AudioPanel minHeight, 32 = SectionLabel + gap, 20 = row padding (pt-2 pb-3).
+          <div className="flex flex-none pt-2 pb-3 gap-0" style={{ minHeight: 352 }}>
             {panels.controller && (
-              <div className={`px-3 flex flex-col gap-2 self-stretch ${panels.audio ? 'flex-1 min-w-0' : 'flex-1'}`}>
+              <div className="px-3 flex flex-col gap-2 self-stretch flex-1 min-w-0">
                 <SectionLabel icon={<ControllerIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/controller?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('controller')} actions={
                   <button type="button" onClick={() => setControllerOptionsOpen(true)} title="Controller options" className="cursor-pointer hover:text-[--color-text-primary] transition-colors"><GearIcon /></button>
                 }>Controller</SectionLabel>
@@ -868,14 +873,14 @@ export function ControllerPage() {
                 </div>
               </div>
             )}
-            {panels.pip && activeProduction?.status === 'active' && (
-              <div className={`${panels.controller ? 'pr-3' : 'px-3'} flex flex-col gap-2 self-stretch shrink-0 overflow-hidden ${panels.controller || panels.audio ? '' : 'flex-1'}`} style={{ width: 540 }}>
+            {panels.pip && numPips > 0 && activeProduction?.status === 'active' && (
+              <div className={`${panels.controller ? 'pr-3' : 'px-3'} flex flex-col gap-2 self-stretch shrink-0 overflow-hidden`} style={{ width: 540 }}>
                 <SectionLabel icon={<PipIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/pip?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('pip')}>PiP Editor</SectionLabel>
                 <PipPanel onApply={handleApplyPip} className="flex-1" />
               </div>
             )}
             {panels.audio && (
-              <div className={`flex flex-col gap-2 self-stretch shrink-0 ${panels.controller ? 'pr-3' : 'px-3'}`} style={{ width: '35%' }}>
+              <div className={`flex flex-col gap-2 self-stretch flex-1 min-w-0 ${panels.controller ? 'pr-3' : 'px-3'}`}>
                 <SectionLabel icon={<AudioIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/audio?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('audio')} actions={
                   <button type="button" onClick={() => setAudioOptionsOpen(true)} title="Audio options" className="cursor-pointer hover:text-[--color-text-primary] transition-colors"><GearIcon /></button>
                 }>Audio</SectionLabel>
@@ -884,6 +889,10 @@ export function ControllerPage() {
                   numAuxBuses={activeProduction?.values?.num_aux_buses !== undefined ? parseInt(String(activeProduction.values.num_aux_buses), 10) : 2}
                   numGroups={activeProduction?.values?.num_groups !== undefined ? parseInt(String(activeProduction.values.num_groups), 10) : 2}
                   showEbuMain={activeProduction?.values?.ebu_main === true}
+                  auxBusPre={activeProduction?.values ? Object.fromEntries(
+                    Array.from({ length: activeProduction.values.num_aux_buses !== undefined ? parseInt(String(activeProduction.values.num_aux_buses), 10) : 2 }, (_, i) => i + 1)
+                      .map((bus) => [bus, activeProduction.values![`aux${bus}_pre`] !== false])
+                  ) : undefined}
                 />
               </div>
             )}
@@ -962,6 +971,7 @@ export function ControllerPage() {
         onClose={() => setControllerOptionsOpen(false)}
       />
     </Modal>
+    <ToastContainer />
     </>
   )
 }

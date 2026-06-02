@@ -115,10 +115,11 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
             </span>
           )}
           {inputSlots.map((slot) => (
-            <div
+            <button
               key={slot.mixerInput}
+              disabled
               className={cn(
-                'flex-1 min-w-14 px-1.5 text-[10px] font-bold truncate border cursor-default select-none flex items-center justify-center tracking-wide',
+                'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border cursor-default select-none flex items-center justify-center tracking-wide',
                 pgmInput === slot.mixerInput
                   ? 'text-white border-white'
                   : 'text-zinc-600 border-zinc-800 bg-zinc-900',
@@ -126,13 +127,14 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
               style={pgmInput === slot.mixerInput ? { background: '#ff0000', borderColor: '#ffffff' } : {}}
             >
               {slot.name}
-            </div>
+            </button>
           ))}
           {(pips ?? []).map((_, pipIdx) => (
-            <div
+            <button
               key={`pgm-pip-${pipIdx}`}
+              disabled
               className={cn(
-                'flex-1 min-w-14 px-1.5 text-[10px] font-bold truncate border cursor-default select-none flex items-center justify-center tracking-wide',
+                'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border cursor-default select-none flex items-center justify-center tracking-wide',
                 pgmPip === pipIdx
                   ? 'text-white border-white'
                   : 'text-zinc-600 border-zinc-800 bg-zinc-900',
@@ -140,7 +142,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
               style={pgmPip === pipIdx ? { background: '#ff0000', borderColor: '#ffffff' } : {}}
             >
               PiP {pipIdx + 1}
-            </div>
+            </button>
           ))}
         </div>
 
@@ -198,7 +200,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
                 onClick={() => !isOnPgm && onSelectPvw(slot.mixerInput)}
                 disabled={isOnPgm}
                 className={cn(
-                  'btn-hardware flex-1 min-w-14 px-1.5 text-[10px] font-bold truncate border transition-all tracking-wide cursor-pointer',
+                  'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border transition-all tracking-wide cursor-pointer flex items-center justify-center',
                   isActive
                     ? 'text-black border-white'
                     : isOnPgm
@@ -220,7 +222,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
                 onClick={() => !isOnPgm && onSelectPvwPip?.(pipIdx)}
                 disabled={isOnPgm}
                 className={cn(
-                  'btn-hardware flex-1 min-w-14 px-1.5 text-[10px] font-bold truncate border transition-all tracking-wide cursor-pointer',
+                  'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border transition-all tracking-wide cursor-pointer flex items-center justify-center',
                   isActive
                     ? 'text-black border-white'
                     : isOnPgm

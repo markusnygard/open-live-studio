@@ -148,9 +148,10 @@ export const useAudioStore = create<AudioState & AudioActions>()(
             s.meters = {}
             s.pendingAfvByMixerInput = {}
           } else if (elements.length === 0) {
-            // Same production (re)connecting — reset per-channel aux sends so stale
-            // levels aren't re-applied when the user first touches a strip after restart.
-            // Master levels are intentionally preserved; the backend re-broadcasts them.
+            // Same production (re)connecting after deactivation — reset all ephemeral
+            // channel state. Master levels are preserved; backend re-broadcasts them.
+            s.pfl = {}
+            s.afl = {}
             s.auxSend = {}
             s.auxSendEnabled = {}
             s.auxSendPre = {}

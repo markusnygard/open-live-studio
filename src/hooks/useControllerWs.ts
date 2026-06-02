@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useProductionStore, type PipZone, type PipConfig } from '@/store/production.store'
 import { useAudioStore } from '@/store/audio.store'
+import { useToastStore } from '@/store/toast.store'
 
 import { BASE } from '@/lib/base'
 const WS_BASE = BASE.replace(/^http/, 'ws')
@@ -70,6 +71,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const applySourceAudioOffset = useProductionStore((s) => s.applySourceAudioOffset)
   const applyAfvRamp           = useProductionStore((s) => s.applyAfvRamp)
   const applyPipState          = useProductionStore((s) => s.applyPipState)
+  const addToast               = useToastStore((s) => s.addToast)
 
   const actionsRef = useRef({
     setPgm, setPvw, setTBarPosition, setDskState,
@@ -79,7 +81,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
     applySourceOffset, applySourceAudioOffset, applyAfvRamp,
-    applyPipState,
+    applyPipState, addToast,
   })
   actionsRef.current = {
     setPgm, setPvw, setTBarPosition, setDskState,
@@ -89,7 +91,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
     applySourceOffset, applySourceAudioOffset, applyAfvRamp,
-    applyPipState,
+    applyPipState, addToast,
   }
 
   useEffect(() => {
@@ -232,6 +234,11 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
                 typeof msg['pvwPip'] === 'number' ? msg['pvwPip'] as number : null,
                 Array.isArray(msg['pips']) ? msg['pips'] as PipConfig[] : [],
               )
+              break
+            case 'ERROR':
+              if (typeof msg['error'] === 'string') {
+                a.addToast(msg['error'])
+              }
               break
           }
         } catch {

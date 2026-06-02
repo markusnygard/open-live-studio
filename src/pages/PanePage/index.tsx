@@ -188,11 +188,12 @@ interface PgmChannel { label: string; url: string }
 // Natural fader height in the AudioPanel at zoom=1 (matches FADER_H in AudioPanel.tsx)
 const NATURAL_FADER_H = 260
 
-function AudioPaneFullscreen({ send, numAuxBuses, numGroups, showEbuMain }: {
+function AudioPaneFullscreen({ send, numAuxBuses, numGroups, showEbuMain, auxBusPre }: {
   send: ReturnType<typeof useControllerWs>
   numAuxBuses?: number
   numGroups?: number
   showEbuMain?: boolean
+  auxBusPre?: Record<number, boolean>
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
@@ -213,7 +214,7 @@ function AudioPaneFullscreen({ send, numAuxBuses, numGroups, showEbuMain }: {
     <div ref={containerRef} className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden scrollbar-hide">
       {/* height inverse of zoom keeps the panel filling exactly one screen height after scaling */}
       <div style={{ zoom, height: `${100 / zoom}%` }}>
-        <AudioPanel send={send} numAuxBuses={numAuxBuses} numGroups={numGroups} showEbuMain={showEbuMain} />
+        <AudioPanel send={send} numAuxBuses={numAuxBuses} numGroups={numGroups} showEbuMain={showEbuMain} auxBusPre={auxBusPre} />
       </div>
     </div>
   )
@@ -418,6 +419,10 @@ export function PanePage() {
             numAuxBuses={activeProduction?.values?.num_aux_buses !== undefined ? parseInt(String(activeProduction.values.num_aux_buses), 10) : 2}
             numGroups={activeProduction?.values?.num_groups !== undefined ? parseInt(String(activeProduction.values.num_groups), 10) : 2}
             showEbuMain={activeProduction?.values?.ebu_main === true}
+            auxBusPre={activeProduction?.values ? Object.fromEntries(
+              Array.from({ length: activeProduction.values.num_aux_buses !== undefined ? parseInt(String(activeProduction.values.num_aux_buses), 10) : 2 }, (_, i) => i + 1)
+                .map((bus) => [bus, activeProduction.values![`aux${bus}_pre`] !== false])
+            ) : undefined}
           />
         </div>
       )}
