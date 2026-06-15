@@ -95,6 +95,12 @@ export const PRODUCTION_PROPERTIES: TemplateProperty[] = [
     max: 100000,
   },
   {
+    id: 'swap_pvw_pgm',
+    label: 'Swap PVW/PGM positions',
+    type: 'boolean',
+    default: false,
+  },
+  {
     id: 'num_aux_buses',
     label: 'AUX Buses',
     type: 'select',

@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react'
-import { useProductionStore, type PipZone, type PipConfig, type PipTransforms } from '@/store/production.store'
+import { useProductionStore, type PipZone, type PipConfig, type PipTransforms, type VideoEffect, type EffectTarget } from '@/store/production.store'
+import { useProductionsStore } from '@/store/productions.store'
 import { useAudioStore } from '@/store/audio.store'
 import { useToastStore } from '@/store/toast.store'
 
@@ -37,6 +38,7 @@ export type OutboundMessage =
   | { type: 'LOUDNESS_RESET' }
   | { type: 'SELECT_PVW_PIP'; pip: number }
   | { type: 'SET_PIP'; pip: number; bg: number | null; zones: PipZone[]; transforms?: PipTransforms }
+  | { type: 'SET_EFFECT'; target: EffectTarget; effect: VideoEffect }
 
 /**
  * Opens a WebSocket connection to /ws/productions/:id/controller.
@@ -71,7 +73,9 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const applySourceAudioOffset = useProductionStore((s) => s.applySourceAudioOffset)
   const applyAfvRamp           = useProductionStore((s) => s.applyAfvRamp)
   const applyPipState          = useProductionStore((s) => s.applyPipState)
+  const applyFxState           = useProductionStore((s) => s.applyFxState)
   const addToast               = useToastStore((s) => s.addToast)
+  const markInactive           = useProductionsStore((s) => s.markInactive)
 
   const actionsRef = useRef({
     setPgm, setPvw, setTBarPosition, setDskState,
@@ -81,7 +85,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
     applySourceOffset, applySourceAudioOffset, applyAfvRamp,
-    applyPipState, addToast,
+    applyPipState, applyFxState, addToast, markInactive,
   })
   actionsRef.current = {
     setPgm, setPvw, setTBarPosition, setDskState,
@@ -91,7 +95,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
     applySourceOffset, applySourceAudioOffset, applyAfvRamp,
-    applyPipState, addToast,
+    applyPipState, applyFxState, addToast, markInactive,
   }
 
   useEffect(() => {
@@ -234,6 +238,18 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
                 typeof msg['pvwPip'] === 'number' ? msg['pvwPip'] as number : null,
                 Array.isArray(msg['pips']) ? msg['pips'] as PipConfig[] : [],
               )
+              break
+            case 'FX_STATE':
+              if (typeof msg['fxAvailable'] === 'boolean' && Array.isArray(msg['inputEffects']) && msg['masterEffect'] !== null && typeof msg['masterEffect'] === 'object') {
+                a.applyFxState(
+                  msg['fxAvailable'] as boolean,
+                  msg['inputEffects'] as VideoEffect[],
+                  msg['masterEffect'] as VideoEffect,
+                )
+              }
+              break
+            case 'PRODUCTION_DEACTIVATED':
+              if (productionId) a.markInactive(productionId)
               break
             case 'ERROR':
               if (typeof msg['error'] === 'string') {
