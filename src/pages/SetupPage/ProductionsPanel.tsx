@@ -287,11 +287,8 @@ function ProductionOptionsModal({ production, onClose }: OptionsModalProps) {
     Math.max(MIN_INPUTS, validSources.length)
   )
 
-  // On open: remove ghost assignments and fix any non-contiguous pad indices in the DB.
+  // On open: fix any non-contiguous pad indices in the DB (ghost cleanup is handled server-side on source deletion).
   useEffect(() => {
-    const ghosts = production.sources.filter((s) => !isValidSource(s.sourceId))
-    for (const ghost of ghosts) void unassignSource(production.id, ghost.mixerInput)
-
     // Re-assign any sources that moved to a new contiguous pad index
     validSources.forEach((s, i) => {
       const compactedPad = mixerInput(i)
@@ -432,8 +429,6 @@ function ProductionOptionsModal({ production, onClose }: OptionsModalProps) {
                     : production.sources.map((s) => <SourceAssignmentBadge key={s.mixerInput} assignment={s} />)
                   }
                 </div>
-              ) : sources.length === 0 ? (
-                <p className="text-xs text-[--color-text-muted] py-1">No sources available.</p>
               ) : (
                 <>
                   <div className="flex flex-col gap-2">
@@ -910,7 +905,7 @@ export function ProductionsPanel() {
                       <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0">
                         <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
                       </svg>
-                      {prod.subscriberCount}
+                      {prod.subscriberCount ?? 0}
                     </span>
                   )}
                   {isActive && idleRemainingSec !== null && idleRemainingSec <= 60 && (prod.subscriberCount ?? 0) === 0 && (

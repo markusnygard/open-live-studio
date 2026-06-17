@@ -30,6 +30,7 @@ export interface Production {
   subscriberCount?: number
   autoDeactivated?: boolean
   idleExpiresAt?: number
+  inputResolutions?: Array<{ width: number; height: number } | null>
 }
 
 interface ProductionsState {
@@ -53,6 +54,7 @@ interface ProductionsActions {
   unassignGraphic: (id: string, dskInput: string) => Promise<void>
   assignOutput: (id: string, outputId: string) => Promise<void>
   unassignOutput: (id: string, outputId: string) => Promise<void>
+  refreshOne: (id: string) => Promise<void>
 }
 
 function fromApi(p: ApiProduction): Production {
@@ -75,6 +77,7 @@ function fromApi(p: ApiProduction): Production {
     subscriberCount: p.subscriberCount,
     autoDeactivated: p.autoDeactivated,
     idleExpiresAt: p.idleExpiresAt,
+    inputResolutions: p.inputResolutions,
   }
 }
 
@@ -266,6 +269,14 @@ export const useProductionsStore = create<ProductionsState & ProductionsActions>
         set((state) => {
           const prod = state.productions.find((p) => p.id === id)
           if (prod) prod.outputAssignments = prod.outputAssignments.filter((o) => o.outputId !== outputId)
+        })
+      },
+
+      refreshOne: async (id) => {
+        const updated = await productionsApi.get(id)
+        set((state) => {
+          const prod = state.productions.find((p) => p.id === id)
+          if (prod) prod.inputResolutions = updated.inputResolutions
         })
       },
     })),

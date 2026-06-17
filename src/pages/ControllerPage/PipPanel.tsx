@@ -25,17 +25,18 @@ function snapToGrid(v: number): number {
   return Math.round(v * GRID_DIVISIONS) / GRID_DIVISIONS
 }
 
-const HANDLE_POSITIONS: Record<string, React.CSSProperties> = {
-  n:  { top: -5, left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' },
-  ne: { top: -5, right: -5, cursor: 'ne-resize' },
-  e:  { top: '50%', transform: 'translateY(-50%)', right: -5, cursor: 'e-resize' },
-  se: { bottom: -5, right: -5, cursor: 'se-resize' },
-  s:  { bottom: -5, left: '50%', transform: 'translateX(-50%)', cursor: 's-resize' },
-  sw: { bottom: -5, left: -5, cursor: 'sw-resize' },
-  w:  { top: '50%', transform: 'translateY(-50%)', left: -5, cursor: 'w-resize' },
-  nw: { top: -5, left: -5, cursor: 'nw-resize' },
+// Handle anchors as fractions within the zone rect (xFrac, yFrac)
+const HANDLE_ANCHORS: Record<string, { xFrac: number; yFrac: number; cursor: string }> = {
+  n:  { xFrac: 0.5, yFrac: 0,   cursor: 'n-resize' },
+  ne: { xFrac: 1,   yFrac: 0,   cursor: 'ne-resize' },
+  e:  { xFrac: 1,   yFrac: 0.5, cursor: 'e-resize' },
+  se: { xFrac: 1,   yFrac: 1,   cursor: 'se-resize' },
+  s:  { xFrac: 0.5, yFrac: 1,   cursor: 's-resize' },
+  sw: { xFrac: 0,   yFrac: 1,   cursor: 'sw-resize' },
+  w:  { xFrac: 0,   yFrac: 0.5, cursor: 'w-resize' },
+  nw: { xFrac: 0,   yFrac: 0,   cursor: 'nw-resize' },
 }
-const HANDLES = Object.keys(HANDLE_POSITIONS) as Array<keyof typeof HANDLE_POSITIONS>
+const HANDLES = Object.keys(HANDLE_ANCHORS)
 
 type DragState = {
   type: 'move' | 'resize'
@@ -54,12 +55,7 @@ function isCropZero(c: SourceCrop): boolean {
   return c.left < 1e-4 && c.top < 1e-4 && c.right < 1e-4 && c.bottom < 1e-4
 }
 
-// Assumed source resolution (used for X/Y/W/H pixel display and canvas math).
-// When Strom provides real input_resolutions we can pass them in.
-const CROP_SRC_W = 1920
-const CROP_SRC_H = 1080
 const CROP_CANVAS_W = 280
-const CROP_CANVAS_H = Math.round(CROP_CANVAS_W * CROP_SRC_H / CROP_SRC_W) // 157
 
 type CropRect = { x: number; y: number; w: number; h: number } // in source pixels
 type CropDrag =
@@ -67,51 +63,57 @@ type CropDrag =
   | { kind: 'resize'; handle: string; startRect: CropRect; startMx: number; startMy: number; lockedAspect: number | null }
 
 /** Convert SourceCrop fractions → pixel rect (visible window in source pixels). */
-function cropToRect(c: SourceCrop): CropRect {
-  const x = Math.round(c.left * CROP_SRC_W)
-  const y = Math.round(c.top * CROP_SRC_H)
-  const w = Math.round((1 - c.left - c.right) * CROP_SRC_W)
-  const h = Math.round((1 - c.top - c.bottom) * CROP_SRC_H)
+function cropToRect(c: SourceCrop, srcW: number, srcH: number): CropRect {
+  const x = Math.round(c.left * srcW)
+  const y = Math.round(c.top * srcH)
+  const w = Math.round((1 - c.left - c.right) * srcW)
+  const h = Math.round((1 - c.top - c.bottom) * srcH)
   return { x, y, w: Math.max(1, w), h: Math.max(1, h) }
 }
 
 /** Convert pixel rect → SourceCrop fractions, clamped to valid range. */
-function rectToCrop(r: CropRect): SourceCrop {
-  const w = Math.max(1, Math.min(r.w, CROP_SRC_W))
-  const h = Math.max(1, Math.min(r.h, CROP_SRC_H))
-  const x = Math.max(0, Math.min(r.x, CROP_SRC_W - w))
-  const y = Math.max(0, Math.min(r.y, CROP_SRC_H - h))
+function rectToCrop(r: CropRect, srcW: number, srcH: number): SourceCrop {
+  const w = Math.max(1, Math.min(r.w, srcW))
+  const h = Math.max(1, Math.min(r.h, srcH))
+  const x = Math.max(0, Math.min(r.x, srcW - w))
+  const y = Math.max(0, Math.min(r.y, srcH - h))
   return {
-    left:   x / CROP_SRC_W,
-    top:    y / CROP_SRC_H,
-    right:  (CROP_SRC_W - x - w) / CROP_SRC_W,
-    bottom: (CROP_SRC_H - y - h) / CROP_SRC_H,
+    left:   x / srcW,
+    top:    y / srcH,
+    right:  (srcW - x - w) / srcW,
+    bottom: (srcH - y - h) / srcH,
   }
 }
 
 const CROP_HANDLES = ['n','ne','e','se','s','sw','w','nw'] as const
-const CROP_HANDLE_STYLE: Record<string, React.CSSProperties> = {
-  n:  { top: -4, left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' },
-  ne: { top: -4, right: -4,   cursor: 'ne-resize' },
-  e:  { top: '50%', transform: 'translateY(-50%)', right: -4, cursor: 'e-resize' },
-  se: { bottom: -4, right: -4, cursor: 'se-resize' },
-  s:  { bottom: -4, left: '50%', transform: 'translateX(-50%)', cursor: 's-resize' },
-  sw: { bottom: -4, left: -4,  cursor: 'sw-resize' },
-  w:  { top: '50%', transform: 'translateY(-50%)', left: -4, cursor: 'w-resize' },
-  nw: { top: -4,    left: -4,  cursor: 'nw-resize' },
+const CROP_HANDLE_ANCHORS: Record<string, { xFrac: number; yFrac: number; cursor: string }> = {
+  n:  { xFrac: 0.5, yFrac: 0,   cursor: 'n-resize' },
+  ne: { xFrac: 1,   yFrac: 0,   cursor: 'ne-resize' },
+  e:  { xFrac: 1,   yFrac: 0.5, cursor: 'e-resize' },
+  se: { xFrac: 1,   yFrac: 1,   cursor: 'se-resize' },
+  s:  { xFrac: 0.5, yFrac: 1,   cursor: 's-resize' },
+  sw: { xFrac: 0,   yFrac: 1,   cursor: 'sw-resize' },
+  w:  { xFrac: 0,   yFrac: 0.5, cursor: 'w-resize' },
+  nw: { xFrac: 0,   yFrac: 0,   cursor: 'nw-resize' },
 }
 
 function CropEditor({
   inputIdx,
   transforms,
   onChange,
+  zoneAspect,
+  srcW = 1920,
+  srcH = 1080,
 }: {
   inputIdx: number
   transforms: PipTransforms
   onChange: (transforms: PipTransforms) => void
+  zoneAspect: number
+  srcW?: number
+  srcH?: number
 }) {
   const crop = transforms[inputIdx] ?? EMPTY_CROP
-  const rect = useMemo(() => cropToRect(crop), [crop])
+  const rect = useMemo(() => cropToRect(crop, srcW, srcH), [crop, srcW, srcH])
 
   const canvasRef = useRef<HTMLDivElement>(null)
   const dragRef   = useRef<CropDrag | null>(null)
@@ -123,18 +125,19 @@ function CropEditor({
   const [pxEdit, setPxEdit] = useState<Partial<Record<'x'|'y'|'w'|'h', string>>>({})
 
   const commit = useCallback((r: CropRect) => {
-    const next = rectToCrop(r)
+    const next = rectToCrop(r, srcW, srcH)
     // If result is essentially full-frame, delete the entry (= no crop)
     if (isCropZero(next)) {
       const t = { ...transforms }; delete t[inputIdx]; onChange(t)
     } else {
       onChange({ ...transforms, [inputIdx]: next })
     }
-  }, [transforms, inputIdx, onChange])
+  }, [transforms, inputIdx, onChange, srcW, srcH])
 
   // Canvas scale: source pixels → display pixels
-  const scaleX = CROP_CANVAS_W / CROP_SRC_W
-  const scaleY = CROP_CANVAS_H / CROP_SRC_H
+  const CROP_CANVAS_H = Math.round(CROP_CANVAS_W * srcH / srcW)
+  const scaleX = CROP_CANVAS_W / srcW
+  const scaleY = CROP_CANVAS_H / srcH
 
   // Crop box position in canvas display pixels
   const boxL = rect.x * scaleX
@@ -165,33 +168,33 @@ function CropEditor({
       const locked = drag.kind === 'resize' ? drag.lockedAspect : null
 
       if (drag.kind === 'move') {
-        r.x = Math.round(clamp(r.x + dx, 0, CROP_SRC_W - r.w))
-        r.y = Math.round(clamp(r.y + dy, 0, CROP_SRC_H - r.h))
+        r.x = Math.round(clamp(r.x + dx, 0, srcW - r.w))
+        r.y = Math.round(clamp(r.y + dy, 0, srcH - r.h))
       } else {
         const h = drag.handle
         if (h.includes('e')) {
           if (locked) {
-            const maxW = Math.min(CROP_SRC_W - r.x, Math.floor((CROP_SRC_H - r.y) * locked))
+            const maxW = Math.min(srcW - r.x, Math.floor((srcH - r.y) * locked))
             r.w = Math.round(clamp(r.w + dx, 10, maxW))
             r.h = Math.round(r.w / locked)
           } else {
-            r.w = Math.round(clamp(r.w + dx, 10, CROP_SRC_W - r.x))
+            r.w = Math.round(clamp(r.w + dx, 10, srcW - r.x))
           }
         }
         if (h.includes('s')) {
           if (locked) {
-            const maxH = Math.min(CROP_SRC_H - r.y, Math.floor((CROP_SRC_W - r.x) / locked))
+            const maxH = Math.min(srcH - r.y, Math.floor((srcW - r.x) / locked))
             r.h = Math.round(clamp(r.h + dy, 10, maxH))
             r.w = Math.round(r.h * locked)
           } else {
-            r.h = Math.round(clamp(r.h + dy, 10, CROP_SRC_H - r.y))
+            r.h = Math.round(clamp(r.h + dy, 10, srcH - r.y))
           }
         }
         if (h.includes('w')) {
           if (locked) {
             const maxDx = r.x + r.w - 10
             const newX = Math.round(clamp(r.x + dx, 0, maxDx))
-            const newW = Math.min(r.x + r.w - newX, Math.floor((CROP_SRC_H - r.y) * locked))
+            const newW = Math.min(r.x + r.w - newX, Math.floor((srcH - r.y) * locked))
             r.x = r.x + r.w - newW; r.w = newW
             r.h = Math.round(r.w / locked)
           } else {
@@ -203,7 +206,7 @@ function CropEditor({
           if (locked) {
             const maxDy = r.y + r.h - 10
             const newY = Math.round(clamp(r.y + dy, 0, maxDy))
-            const newH = Math.min(r.y + r.h - newY, Math.floor((CROP_SRC_W - r.x) / locked))
+            const newH = Math.min(r.y + r.h - newY, Math.floor((srcW - r.x) / locked))
             r.y = r.y + r.h - newH; r.h = newH
             r.w = Math.round(r.h * locked)
           } else {
@@ -237,10 +240,10 @@ function CropEditor({
     const newL = clamp(cx - newW / 2, 0, 1 - newW)
     const newT = clamp(cy - newH / 2, 0, 1 - newH)
     commit({
-      x: Math.round(newL * CROP_SRC_W),
-      y: Math.round(newT * CROP_SRC_H),
-      w: Math.round(newW * CROP_SRC_W),
-      h: Math.round(newH * CROP_SRC_H),
+      x: Math.round(newL * srcW),
+      y: Math.round(newT * srcH),
+      w: Math.round(newW * srcW),
+      h: Math.round(newH * srcH),
     })
   }
 
@@ -260,7 +263,10 @@ function CropEditor({
     <div className="flex flex-col gap-2 p-2 bg-zinc-900 border border-zinc-700">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Crop / Zoom</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] text-zinc-500 uppercase tracking-wider">Crop / Zoom</span>
+          <span className="text-[9px] font-mono text-zinc-600">{srcW}×{srcH}</span>
+        </div>
         <button
           onClick={resetCrop}
           className="text-[9px] px-1.5 py-0.5 border border-zinc-700 text-zinc-500 hover:text-orange-400 hover:border-zinc-500 leading-none"
@@ -272,8 +278,8 @@ function CropEditor({
       {/* Canvas */}
       <div
         ref={canvasRef}
-        className="relative select-none overflow-hidden shrink-0"
-        style={{ width: CROP_CANVAS_W, height: CROP_CANVAS_H, background: '#0a0a0a', border: '1px solid #3f3f46', boxSizing: 'content-box' }}
+        className="relative select-none shrink-0"
+        style={{ width: CROP_CANVAS_W, height: CROP_CANVAS_H, background: '#0a0a0a', outline: '1px solid #3f3f46', boxSizing: 'content-box', overflow: 'visible' }}
       >
         {/* Masked (cropped-out) overlay — four rects */}
         {/* left */}
@@ -295,22 +301,29 @@ function CropEditor({
             cursor: 'move',
           }}
           onMouseDown={(e) => startDrag(e, 'move')}
-        >
-          {/* Resize handles */}
-          {CROP_HANDLES.map((h) => (
+        />
+
+        {/* Resize handles — rendered on canvas so they're never clipped at edges */}
+        {CROP_HANDLES.map((h) => {
+          const anchor = CROP_HANDLE_ANCHORS[h]!
+          return (
             <div
               key={h}
               style={{
                 position: 'absolute',
+                left: boxL + anchor.xFrac * boxW,
+                top: boxT + anchor.yFrac * boxH,
+                transform: 'translate(-50%, -50%)',
                 width: 7, height: 7,
                 background: '#f97316',
                 border: '1px solid rgba(0,0,0,0.6)',
-                ...CROP_HANDLE_STYLE[h],
+                cursor: anchor.cursor,
+                zIndex: 10,
               }}
               onMouseDown={(e) => startDrag(e, 'resize', h)}
             />
-          ))}
-        </div>
+          )
+        })}
 
         {/* Size label inside box */}
         <div style={{
@@ -330,10 +343,9 @@ function CropEditor({
           min={0.05}
           max={1}
           step={0.01}
-          value={zoomFrac}
-          onChange={(e) => handleZoom(parseFloat(e.target.value))}
+          value={1.05 - zoomFrac}
+          onChange={(e) => handleZoom(1.05 - parseFloat(e.target.value))}
           className="flex-1 h-1 accent-orange-500 cursor-pointer"
-          style={{ direction: 'rtl' }} // left = zoomed in, right = zoomed out
         />
         <span className="text-[9px] text-zinc-400 font-mono w-8 text-right shrink-0">
           {zoomFrac < 0.999 ? `${Math.round(1 / zoomFrac * 10) / 10}×` : '1×'}
@@ -367,17 +379,17 @@ function CropEditor({
               const locking = e.target.checked
               setAspectLocked(locking)
               if (locking) {
-                // Source is 16:9, so for a 16:9 crop: pixel_w/pixel_h = W/H
-                // → (curW*W)/(curH*H) = W/H → curH = curW
+                // Reset crop to match zone's aspect ratio at current zoom width
+                // zoneAspect = zone.rect.w / zone.rect.h (normalised, same coord space as source)
                 const curW = 1 - crop.left - crop.right
-                const newH = curW  // equal fractions = 16:9 for a 16:9 source
+                const newH = clamp(curW / zoneAspect, 0.05, 1)
                 const cx = crop.left + curW / 2
                 const cy = crop.top + (1 - crop.top - crop.bottom) / 2
                 commit({
-                  x: Math.round(clamp(cx - curW / 2, 0, 1 - curW) * CROP_SRC_W),
-                  y: Math.round(clamp(cy - newH / 2, 0, 1 - newH) * CROP_SRC_H),
-                  w: Math.round(curW * CROP_SRC_W),
-                  h: Math.round(newH * CROP_SRC_H),
+                  x: Math.round(clamp(cx - curW / 2, 0, 1 - curW) * srcW),
+                  y: Math.round(clamp(cy - newH / 2, 0, 1 - newH) * srcH),
+                  w: Math.round(curW * srcW),
+                  h: Math.round(newH * srcH),
                 })
               }
             }}
@@ -529,7 +541,7 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
     const newIdx = draft.zones.length
     setDraft((prev) => {
       const next = structuredClone(prev)
-      next.zones.push({ rect: { x: 0.55, y: 0.10, w: 0.42, h: 0.42 }, capacity: null, sources: [] })
+      next.zones.push({ rect: { x: 5/9, y: 1/9, w: 4/9, h: 4/9 }, capacity: null, sources: [] })
       return next
     })
     setActiveZoneIdx(newIdx)
@@ -724,8 +736,8 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
           {/* Zone canvas */}
           <div
             ref={canvasRef}
-            className="relative select-none overflow-hidden"
-            style={{ width: 420, aspectRatio: '16/9', background: '#111', border: '1px solid #3f3f46' }}
+            className="relative select-none"
+            style={{ width: 420, aspectRatio: '16/9', background: '#111', outline: '1px solid #3f3f46', overflow: 'visible' }}
           >
             {draft.zones.map((zone, zIdx) => {
               const r = zone.rect ?? { x: 0, y: 0, w: 1, h: 1 }
@@ -762,19 +774,6 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
                       <span style={{ fontSize: 9, color, opacity: 0.7 }}>AUTO</span>
                     </div>
                   )}
-                  {isActive && HANDLES.map((h) => (
-                    <div
-                      key={h}
-                      style={{
-                        position: 'absolute',
-                        width: 8, height: 8,
-                        background: color,
-                        border: '1px solid rgba(0,0,0,0.5)',
-                        ...HANDLE_POSITIONS[h],
-                      }}
-                      onMouseDown={(e) => startDrag(e, zIdx, h)}
-                    />
-                  ))}
                 </div>
               )
             })}
@@ -785,6 +784,33 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
             {snapEnabled && Array.from({ length: GRID_DIVISIONS - 1 }, (_, i) => i + 1).map((i) => (
               <div key={`h${i}`} style={{ position: 'absolute', left: 0, right: 0, top: `${(i / GRID_DIVISIONS) * 100}%`, height: 1, background: i % 3 === 0 ? 'rgba(6,182,212,0.45)' : 'rgba(6,182,212,0.18)', pointerEvents: 'none' }} />
             ))}
+            {/* Active zone handles — rendered on canvas so they're never clipped by zone overflow and always on top */}
+            {(() => {
+              const activeZone = draft.zones[activeZoneIdx]
+              const r = activeZone?.rect
+              if (!r) return null
+              const color = ZONE_COLORS[activeZoneIdx % ZONE_COLORS.length]!
+              return HANDLES.map((h) => {
+                const anchor = HANDLE_ANCHORS[h]!
+                return (
+                  <div
+                    key={h}
+                    style={{
+                      position: 'absolute',
+                      left: `${(r.x + anchor.xFrac * r.w) * 100}%`,
+                      top: `${(r.y + anchor.yFrac * r.h) * 100}%`,
+                      transform: 'translate(-50%, -50%)',
+                      width: 8, height: 8,
+                      background: color,
+                      border: '1px solid rgba(0,0,0,0.5)',
+                      cursor: anchor.cursor,
+                      zIndex: 20,
+                    }}
+                    onMouseDown={(e) => startDrag(e, activeZoneIdx, h)}
+                  />
+                )
+              })
+            })()}
             {draft.bg !== null && (
               <div style={{ position: 'absolute', bottom: 4, left: 4, fontSize: 8, color: '#a1a1aa', background: 'rgba(0,0,0,0.6)', padding: '1px 4px' }}>
                 BG: {(inputSlots[draft.bg]?.name ?? String(draft.bg + 1))}
@@ -991,9 +1017,11 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
               className="flex-1 bg-zinc-900 border border-zinc-700 text-zinc-300 text-[10px] px-1.5 py-0.5 focus:outline-none focus:border-zinc-500"
             >
               <option value="">None</option>
-              {inputSlots.filter((s) => !isUsedAsBg(s.idx)).map((slot) => (
-                <option key={slot.idx} value={slot.idx}>{slot.name}</option>
-              ))}
+              {inputSlots.filter((s) => !isUsedAsBg(s.idx)).map((slot) => {
+                const res = production?.inputResolutions?.[slot.idx]
+                const label = res ? `${slot.name} (${res.width}×${res.height})` : slot.name
+                return <option key={slot.idx} value={slot.idx}>{label}</option>
+              })}
             </select>
           </div>
           {selectedSourceIdx !== null && !isUsedAsBg(selectedSourceIdx) && (
@@ -1004,6 +1032,9 @@ export function PipPanel({ onApply, className }: PipPanelProps) {
                 markDirty()
                 setDraft((prev) => ({ ...prev, transforms }))
               }}
+              zoneAspect={(() => { const r = draft.zones[activeZoneIdx]?.rect; return r ? r.w / r.h : 16 / 9 })()}
+              srcW={production?.inputResolutions?.[selectedSourceIdx]?.width}
+              srcH={production?.inputResolutions?.[selectedSourceIdx]?.height}
             />
           )}
         </div>

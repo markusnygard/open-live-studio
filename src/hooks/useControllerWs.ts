@@ -71,6 +71,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const applyLoudness          = useAudioStore((s) => s.applyLoudness)
   const applySourceOffset      = useProductionStore((s) => s.applySourceOffset)
   const applySourceAudioOffset = useProductionStore((s) => s.applySourceAudioOffset)
+  const resetSourceOffsets     = useProductionStore((s) => s.resetSourceOffsets)
   const applyAfvRamp           = useProductionStore((s) => s.applyAfvRamp)
   const applyPipState          = useProductionStore((s) => s.applyPipState)
   const applyFxState           = useProductionStore((s) => s.applyFxState)
@@ -84,7 +85,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyAuxSend, applyAuxSendPre, applyAuxMaster,
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
-    applySourceOffset, applySourceAudioOffset, applyAfvRamp,
+    applySourceOffset, applySourceAudioOffset, resetSourceOffsets, applyAfvRamp,
     applyPipState, applyFxState, addToast, markInactive,
   })
   actionsRef.current = {
@@ -94,7 +95,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyAuxSend, applyAuxSendPre, applyAuxMaster,
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
-    applySourceOffset, applySourceAudioOffset, applyAfvRamp,
+    applySourceOffset, applySourceAudioOffset, resetSourceOffsets, applyAfvRamp,
     applyPipState, applyFxState, addToast, markInactive,
   }
 
@@ -250,6 +251,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
               break
             case 'PRODUCTION_DEACTIVATED':
               if (productionId) a.markInactive(productionId)
+              a.resetSourceOffsets()
               break
             case 'ERROR':
               if (typeof msg['error'] === 'string') {

@@ -43,7 +43,7 @@ export const TRANSITION_LABELS: Record<TransitionType, string> = {
   barn_doors:     'BARN',
   star_wipe:      'STAR',
   pinwheel:       'PINWHEEL',
-  crosshatch:     'CROSSHATCH',
+  crosshatch:     'CROSS\nHATCH',
   hex_dissolve:   'HEX',
   warp_wipe:      'WARP',
   melt:           'MELT',
@@ -95,21 +95,17 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
   )
   const isCustomActive = !DURATION_PRESETS_MS.includes(transitionDurationMs)
   const [isEditingCustom, setIsEditingCustom] = useState(false)
-  // Raw string while editing so clearing the field doesn't snap to 0
   const [editValue, setEditValue] = useState('')
   const customInputRef = useRef<HTMLInputElement>(null)
 
-  // Exit edit mode whenever a preset is selected
   useEffect(() => {
     if (!isCustomActive) setIsEditingCustom(false)
   }, [isCustomActive])
 
   const handleCustomClick = () => {
     if (!isCustomActive) {
-      // First click: select
       setTransitionDuration(customMs)
     } else if (!isEditingCustom) {
-      // Second click: enter edit mode — seed string from current value
       setEditValue(String(customMs))
       setIsEditingCustom(true)
       setTimeout(() => { customInputRef.current?.select() }, 0)
@@ -133,7 +129,6 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
     '__test2__': 'COLORS',
   }
 
-  // One slot per assignment, sorted by mixer input — handles duplicates and virtual sources
   const inputSlots = [...(production?.sources ?? [])]
     .sort((a, b) => a.mixerInput.localeCompare(b.mixerInput))
     .map((a) => {
@@ -142,59 +137,153 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
       return { mixerInput: a.mixerInput, sourceId: a.sourceId, name }
     })
 
+  const activeTransitions = TRANSITION_TYPES.filter((t) => !visibleTransitions || visibleTransitions.includes(t))
+  const numTransitionRows = Math.max(1, Math.ceil(activeTransitions.length / 4))
+
   return (
-    <div className={cn("flex flex-col border border-zinc-800 bg-zinc-950 overflow-hidden", className)}>
+    <div className={cn("flex flex-row border border-zinc-800 bg-zinc-950 overflow-hidden", className)}>
 
-      {/* ── PGM row ──────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
-        {/* Row label */}
-        <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
-          style={{ width: 40, background: 'rgba(255,0,0,0.12)' }}>
-          <span className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: '#ff0000' }}>PGM</span>
+      {/* ── Left: row labels + source tiles + T-bar ────────────────────────── */}
+      <div className="flex flex-col flex-1 min-w-0">
+
+        {/* PGM row */}
+        <div className="flex flex-1 items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
+          <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
+            style={{ width: 40, background: 'rgba(255,0,0,0.12)' }}>
+            <span className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: '#ff0000' }}>PGM</span>
+          </div>
+          <div className="flex items-stretch gap-px flex-1 overflow-x-auto p-1">
+            {inputSlots.length === 0 && (
+              <span className="text-[9px] text-zinc-600 italic px-1 flex items-center">{'NO SOURCES'}</span>
+            )}
+            {inputSlots.map((slot) => (
+              <button
+                key={slot.mixerInput}
+                disabled
+                className={cn(
+                  'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border cursor-default select-none flex items-center justify-center tracking-wide',
+                  pgmInput === slot.mixerInput
+                    ? 'text-white border-white'
+                    : 'text-zinc-600 border-zinc-800 bg-zinc-900',
+                )}
+                style={pgmInput === slot.mixerInput ? { background: '#ff0000', borderColor: '#ffffff' } : {}}
+              >
+                {slot.name}
+              </button>
+            ))}
+            {(pips ?? []).map((_, pipIdx) => (
+              <button
+                key={`pgm-pip-${pipIdx}`}
+                disabled
+                className={cn(
+                  'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border cursor-default select-none flex items-center justify-center tracking-wide',
+                  pgmPip === pipIdx
+                    ? 'text-white border-white'
+                    : 'text-zinc-600 border-zinc-800 bg-zinc-900',
+                )}
+                style={pgmPip === pipIdx ? { background: '#ff0000', borderColor: '#ffffff' } : {}}
+              >
+                PiP {pipIdx + 1}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Source tiles */}
-        <div className="flex items-stretch gap-px flex-1 overflow-x-auto p-1">
-          {inputSlots.length === 0 && (
-            <span className="text-[9px] text-zinc-600 italic px-1 flex items-center">
-              {'NO SOURCES'}
+        {/* PVW row */}
+        <div className="flex flex-1 items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
+          <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
+            style={{ width: 40, background: 'rgba(0,204,0,0.10)' }}>
+            <span className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: '#00cc00' }}>PVW</span>
+          </div>
+          <div className="flex items-stretch gap-px flex-1 overflow-x-auto p-1">
+            {inputSlots.length === 0 && (
+              <span className="text-[9px] text-zinc-600 italic px-1 flex items-center">{'NO SOURCES'}</span>
+            )}
+            {inputSlots.map((slot) => {
+              const isOnPgm = pgmInput === slot.mixerInput
+              const isActive = pvwInput === slot.mixerInput
+              return (
+                <button
+                  key={slot.mixerInput}
+                  onClick={() => !isOnPgm && onSelectPvw(slot.mixerInput)}
+                  disabled={isOnPgm}
+                  className={cn(
+                    'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border transition-all tracking-wide cursor-pointer flex items-center justify-center',
+                    isActive
+                      ? 'text-black border-white'
+                      : isOnPgm
+                        ? 'text-zinc-700 bg-zinc-900 border-zinc-800 opacity-40 cursor-not-allowed'
+                        : 'text-zinc-500 bg-zinc-900 border-zinc-800 hover:text-white hover:border-zinc-500',
+                  )}
+                  style={isActive ? { background: '#00cc00', borderColor: '#ffffff' } : {}}
+                >
+                  {slot.name}
+                </button>
+              )
+            })}
+            {(pips ?? []).map((_, pipIdx) => {
+              const isOnPgm = pgmPip === pipIdx
+              const isActive = pvwPip === pipIdx
+              return (
+                <button
+                  key={`pvw-pip-${pipIdx}`}
+                  onClick={() => !isOnPgm && onSelectPvwPip?.(pipIdx)}
+                  disabled={isOnPgm}
+                  className={cn(
+                    'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border transition-all tracking-wide cursor-pointer flex items-center justify-center',
+                    isActive
+                      ? 'text-black border-white'
+                      : isOnPgm
+                        ? 'text-zinc-700 bg-zinc-900 border-zinc-800 opacity-40 cursor-not-allowed'
+                        : 'text-zinc-500 bg-zinc-900 border-zinc-800 hover:text-white hover:border-zinc-500',
+                  )}
+                  style={isActive ? { background: '#00cc00', borderColor: '#ffffff' } : {}}
+                >
+                  PiP {pipIdx + 1}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* OVL / T-bar row */}
+        <div className="flex flex-1 items-stretch">
+          <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800" style={{ width: 40 }}>
+            <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-600">OVL</span>
+          </div>
+          <div className="flex items-center flex-1 px-3 py-2 gap-3">
+            <div className="relative flex-1 flex items-center" style={{ height: 24 }}>
+              <div
+                className="absolute inset-x-0"
+                style={{ height: 4, background: '#1a1a1a', border: '1px solid #333333', top: '50%', transform: 'translateY(-50%)' }}
+              />
+              <div
+                className="absolute left-0"
+                style={{ height: 4, width: `${tBarPosition * 100}%`, background: '#f97316', top: '50%', transform: 'translateY(-50%)', transition: 'width 40ms linear' }}
+              />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={Math.round(tBarPosition * 100)}
+                onChange={(e) => { const v = Number(e.target.value) / 100; setTBarPosition(v); debouncedSetOvl(v) }}
+                className="absolute inset-0 w-full opacity-0 cursor-pointer"
+                style={{ zIndex: 2 }}
+              />
+            </div>
+            <span className="text-[10px] font-mono text-zinc-500 w-10 text-right tabular-nums shrink-0">
+              {tBarPosition.toFixed(2)}
             </span>
-          )}
-          {inputSlots.map((slot) => (
-            <button
-              key={slot.mixerInput}
-              disabled
-              className={cn(
-                'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border cursor-default select-none flex items-center justify-center tracking-wide',
-                pgmInput === slot.mixerInput
-                  ? 'text-white border-white'
-                  : 'text-zinc-600 border-zinc-800 bg-zinc-900',
-              )}
-              style={pgmInput === slot.mixerInput ? { background: '#ff0000', borderColor: '#ffffff' } : {}}
-            >
-              {slot.name}
-            </button>
-          ))}
-          {(pips ?? []).map((_, pipIdx) => (
-            <button
-              key={`pgm-pip-${pipIdx}`}
-              disabled
-              className={cn(
-                'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border cursor-default select-none flex items-center justify-center tracking-wide',
-                pgmPip === pipIdx
-                  ? 'text-white border-white'
-                  : 'text-zinc-600 border-zinc-800 bg-zinc-900',
-              )}
-              style={pgmPip === pipIdx ? { background: '#ff0000', borderColor: '#ffffff' } : {}}
-            >
-              PiP {pipIdx + 1}
-            </button>
-          ))}
+          </div>
         </div>
 
-        {/* Action group: TAKE + AUTO + FTB */}
-        <div className="flex items-stretch gap-px p-1 shrink-0 border-l border-zinc-800" style={{ width: 224 }}>
-          {/* TAKE — large physical button */}
+      </div>
+
+      {/* ── Right: TAKE/AUTO/FTB + transitions + duration presets ────────────── */}
+      <div className="flex flex-col shrink-0 border-l border-zinc-800" style={{ width: 224 }}>
+
+        {/* TAKE / AUTO / FTB */}
+        <div className="flex items-stretch gap-px p-1 border-b border-zinc-800" style={{ flex: 1 }}>
           <button
             onClick={onCut}
             className="btn-hardware flex-1 text-[11px] font-bold uppercase tracking-widest text-white border ring-1 ring-inset ring-white transition-opacity hover:opacity-90 cursor-pointer"
@@ -220,77 +309,15 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
             FTB
           </button>
         </div>
-      </div>
 
-      {/* ── PVW row ──────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 items-stretch border-b border-zinc-800" style={{ minHeight: 38 }}>
-        {/* Row label */}
-        <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800"
-          style={{ width: 40, background: 'rgba(0,204,0,0.10)' }}>
-          <span className="text-[9px] font-bold uppercase tracking-[0.15em]" style={{ color: '#00cc00' }}>PVW</span>
-        </div>
-
-        {/* Source tiles */}
-        <div className="flex items-stretch gap-px flex-1 overflow-x-auto p-1">
-          {inputSlots.length === 0 && (
-            <span className="text-[9px] text-zinc-600 italic px-1 flex items-center">
-              {'NO SOURCES'}
-            </span>
-          )}
-          {inputSlots.map((slot) => {
-            const isOnPgm = pgmInput === slot.mixerInput
-            const isActive = pvwInput === slot.mixerInput
-            return (
-              <button
-                key={slot.mixerInput}
-                onClick={() => !isOnPgm && onSelectPvw(slot.mixerInput)}
-                disabled={isOnPgm}
-                className={cn(
-                  'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border transition-all tracking-wide cursor-pointer flex items-center justify-center',
-                  isActive
-                    ? 'text-black border-white'
-                    : isOnPgm
-                      ? 'text-zinc-700 bg-zinc-900 border-zinc-800 opacity-40 cursor-not-allowed'
-                      : 'text-zinc-500 bg-zinc-900 border-zinc-800 hover:text-white hover:border-zinc-500',
-                )}
-                style={isActive ? { background: '#00cc00', borderColor: '#ffffff' } : {}}
-              >
-                {slot.name}
-              </button>
-            )
-          })}
-          {(pips ?? []).map((_, pipIdx) => {
-            const isOnPgm = pgmPip === pipIdx
-            const isActive = pvwPip === pipIdx
-            return (
-              <button
-                key={`pvw-pip-${pipIdx}`}
-                onClick={() => !isOnPgm && onSelectPvwPip?.(pipIdx)}
-                disabled={isOnPgm}
-                className={cn(
-                  'btn-hardware flex-1 min-w-14 px-1.5 py-0 text-[10px] font-bold break-words border transition-all tracking-wide cursor-pointer flex items-center justify-center',
-                  isActive
-                    ? 'text-black border-white'
-                    : isOnPgm
-                      ? 'text-zinc-700 bg-zinc-900 border-zinc-800 opacity-40 cursor-not-allowed'
-                      : 'text-zinc-500 bg-zinc-900 border-zinc-800 hover:text-white hover:border-zinc-500',
-                )}
-                style={isActive ? { background: '#00cc00', borderColor: '#ffffff' } : {}}
-              >
-                PiP {pipIdx + 1}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Transition type selector */}
-        <div className="flex items-stretch shrink-0 border-l border-zinc-800 p-1 gap-px" style={{ width: 224 }}>
-          {TRANSITION_TYPES.filter((t) => !visibleTransitions || visibleTransitions.includes(t)).map((type) => (
+        {/* Transition type chips — max 4 per row */}
+        <div className="grid p-1 gap-px overflow-hidden" style={{ flex: numTransitionRows, gridTemplateColumns: 'repeat(4, 1fr)', gridAutoRows: '1fr' }}>
+          {activeTransitions.map((type) => (
             <button
               key={type}
               onClick={() => setTransitionType(type)}
               className={cn(
-                'btn-hardware flex-1 text-[10px] font-bold uppercase tracking-widest border transition-colors cursor-pointer',
+                'btn-hardware w-full text-[9px] font-bold uppercase tracking-wide border transition-colors cursor-pointer leading-tight overflow-hidden whitespace-pre-wrap',
                 transitionType === type
                   ? 'text-black bg-orange-500 border-orange-400'
                   : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-300 hover:bg-zinc-800',
@@ -300,58 +327,9 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
             </button>
           ))}
         </div>
-      </div>
 
-      {/* ── OVL / T-bar row ─────────────────────────────────────────────────── */}
-      <div className="flex flex-1 items-stretch">
-        {/* Row label */}
-        <div className="flex items-center justify-center px-2 shrink-0 border-r border-zinc-800" style={{ width: 40 }}>
-          <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-zinc-600">OVL</span>
-        </div>
-
-        {/* T-bar slider — styled like a physical fader */}
-        <div className="flex items-center flex-1 px-3 py-2 gap-3">
-          <div className="relative flex-1 flex items-center" style={{ height: 24 }}>
-            {/* Track background */}
-            <div
-              className="absolute inset-x-0"
-              style={{
-                height: 4,
-                background: '#1a1a1a',
-                border: '1px solid #333333',
-                top: '50%',
-                transform: 'translateY(-50%)',
-              }}
-            />
-            {/* Fill */}
-            <div
-              className="absolute left-0"
-              style={{
-                height: 4,
-                width: `${tBarPosition * 100}%`,
-                background: '#f97316',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                transition: 'width 40ms linear',
-              }}
-            />
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(tBarPosition * 100)}
-              onChange={(e) => { const v = Number(e.target.value) / 100; setTBarPosition(v); debouncedSetOvl(v) }}
-              className="absolute inset-0 w-full opacity-0 cursor-pointer"
-              style={{ zIndex: 2 }}
-            />
-          </div>
-          <span className="text-[10px] font-mono text-zinc-500 w-10 text-right tabular-nums shrink-0">
-            {tBarPosition.toFixed(2)}
-          </span>
-        </div>
-
-        {/* Duration presets + custom ms input */}
-        <div className="flex items-stretch gap-px p-1 shrink-0 border-l border-zinc-800" style={{ width: 224 }}>
+        {/* Duration presets */}
+        <div className="flex items-stretch gap-px p-1 border-t border-zinc-800" style={{ flex: 1 }}>
           {DURATION_PRESETS_MS.map((ms) => (
             <button
               key={ms}
@@ -400,6 +378,7 @@ export function TransitionPanel({ onCut, onAuto, onFtb, onSelectPvw, onSetOvl, o
             )}>MS</span>
           </div>
         </div>
+
       </div>
 
     </div>

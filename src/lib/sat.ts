@@ -1,18 +1,12 @@
 /**
  * OSC Service Access Token (SAT) exchange for the Open Live API.
  *
- * The studio reads OSC_PAT from the runtime env (injected by
- * docker-entrypoint.sh from the OSC parameter store).  On first API call
- * it exchanges the PAT for a short-lived SAT and caches it, refreshing
- * automatically 5 minutes before expiry.
+ * OSC_PAT is baked into the bundle at build time (Docker build arg).
+ * On first API call it is exchanged for a short-lived SAT which is cached
+ * and refreshed automatically 5 minutes before expiry.
  *
  * When no PAT is configured (local dev), getApiToken() returns undefined
  * and API requests are sent without an Authorization header.
- *
- * authenticateWithOpenLive() writes the SAT as the OSC-standard
- * `eyevinn-open-live.sat` cookie on `.osaas.io`, which OSC's reverse proxy
- * recognises for both REST and WebSocket requests — no open-live code changes
- * needed.
  */
 
 const TOKEN_EXCHANGE_URL = 'https://token.svc.prod.osaas.io/servicetoken'
@@ -35,13 +29,7 @@ function isExpiringSoon(c: SatCache): boolean {
 }
 
 function getPat(): string | undefined {
-  // OSC_PAT must only come from window._env_ (injected at runtime by docker-entrypoint.sh).
-  // It must never be read from import.meta.env — that would bake it into the JS bundle.
-  return (
-    (typeof window !== 'undefined' &&
-      (window as unknown as { _env_?: { OSC_PAT?: string } })._env_?.OSC_PAT) ||
-    undefined
-  )
+  return import.meta.env.OSC_PAT || undefined
 }
 
 /**

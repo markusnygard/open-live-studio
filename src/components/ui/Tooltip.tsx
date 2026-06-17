@@ -24,7 +24,7 @@ export function Tooltip({ content, children, title, className }: TooltipProps) {
 
   return (
     <>
-      <span ref={triggerRef} onMouseEnter={show} onMouseLeave={hide} className={className}>
+      <span ref={triggerRef} onMouseEnter={show} onMouseLeave={hide} className={className} style={{ cursor: 'help' }}>
         {children}
       </span>
       {visible && createPortal(

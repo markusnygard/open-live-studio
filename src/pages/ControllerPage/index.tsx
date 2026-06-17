@@ -278,7 +278,7 @@ function SourceOffsetInput({
         const val = parseFloat(raw)
         if (Number.isFinite(val)) onChange(val)
       }}
-      className="w-20 text-right text-[11px] bg-[--color-surface-2] border border-[--color-border] rounded px-2 py-0.5 text-[--color-text-primary] focus:outline-none focus:border-orange-500"
+      className="flex-1 min-w-0 text-right text-[9px] font-bold bg-transparent border-none focus:outline-none text-orange-500"
       aria-label={`${label} time offset ms`}
     />
   )
@@ -350,87 +350,101 @@ function ControllerOptionsContent({
     { label: 'FX Takes', gpu: true, types: ['glitch_cut', 'flash_dissolve', 'whip_pan_left', 'whip_pan_right', 'punch_zoom', 'pixelate_take', 'zoom_blur', 'spin', 'tv_roll', 'negative_flash', 'ripple'] },
   ]
 
-  return (
-    <div className="flex flex-col gap-5" style={{ minWidth: 520 }}>
+  const leftColStyle: React.CSSProperties = { width: 96, minWidth: 96, background: '#18181b', borderRight: '1px solid #1e1e1e' }
 
-      {/* ── Transitions ───────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-0">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 pb-2">Visible transitions</span>
-        <div className="flex flex-col gap-0 divide-y divide-zinc-800">
-          {TRANSITION_GROUPS.map((group) => (
-            <div key={group.label} className="flex items-start gap-4 py-2">
-              {/* Group label — fixed width column */}
-              <div className="flex items-center gap-1.5 pt-px shrink-0" style={{ width: 76 }}>
-                <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{group.label}</span>
-                {group.gpu && (
-                  <span className="text-[8px] text-zinc-600 font-medium px-1 py-px rounded border border-zinc-700 leading-none">GPU</span>
-                )}
+  return (
+    <div className="flex flex-col gap-4" style={{ minWidth: 640 }}>
+
+      <div className="flex gap-4 items-start">
+
+        {/* ── Transitions ─────────────────────────────────────────────────────── */}
+        <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Visible transitions</span>
+            <span className="text-[9px] font-mono font-bold tabular-nums text-orange-500">{draftTransitions.length}/16</span>
+          </div>
+          <div className="flex flex-col border border-zinc-800 rounded overflow-hidden">
+            {TRANSITION_GROUPS.map((group) => (
+              <div key={group.label} className="flex items-stretch border-b border-zinc-800 last:border-b-0">
+                {/* Group label */}
+                <div className="flex items-center gap-1.5 px-3 py-2 shrink-0" style={leftColStyle}>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 whitespace-nowrap">{group.label}</span>
+                  {group.gpu && <span className="text-[8px] text-zinc-600 border border-zinc-700 px-1 rounded leading-none shrink-0">GPU</span>}
+                </div>
+                {/* Chips */}
+                <div className="flex flex-wrap gap-1 p-2">
+                  {group.types.map((t) => {
+                    const active = draftTransitions.includes(t)
+                    const isLast = draftTransitions.length === 1 && active
+                    const atMax  = draftTransitions.length >= 16 && !active
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        disabled={isLast || atMax}
+                        onClick={() => setDraftTransitions(active
+                          ? draftTransitions.filter((x) => x !== t)
+                          : [...draftTransitions, t])}
+                        className={cn(
+                          'btn-hardware px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest border transition-colors cursor-pointer whitespace-nowrap',
+                          active
+                            ? 'text-black bg-orange-500 border-orange-400'
+                            : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-200 hover:border-zinc-500',
+                          (isLast || atMax) && 'opacity-40 cursor-not-allowed',
+                        )}
+                      >
+                        {TRANSITION_LABELS[t as keyof typeof TRANSITION_LABELS] ?? t}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-              {/* Toggle chips */}
-              <div className="flex flex-wrap gap-1">
-                {group.types.map((t) => {
-                  const active  = draftTransitions.includes(t)
-                  const isLast  = draftTransitions.length === 1 && active
-                  return (
-                    <button
-                      key={t}
-                      type="button"
-                      disabled={isLast}
-                      onClick={() => setDraftTransitions(active
-                        ? draftTransitions.filter((x) => x !== t)
-                        : [...draftTransitions, t])}
-                      className={cn(
-                        'btn-hardware px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest border transition-colors cursor-pointer',
-                        active
-                          ? 'text-black bg-orange-500 border-orange-400'
-                          : 'text-zinc-500 bg-zinc-900 border-zinc-700 hover:text-zinc-200 hover:border-zinc-500',
-                        isLast && 'opacity-40 cursor-not-allowed',
-                      )}
-                    >
-                      {TRANSITION_LABELS[t as keyof typeof TRANSITION_LABELS] ?? t}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
+
+        {/* ── Source timing ───────────────────────────────────────────────────── */}
+        {assignments.length > 0 && (
+          <div className="flex flex-col shrink-0" style={{ width: 300 }}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">Source timing</span>
+              <Tooltip title="Video delay" content={<span className="text-[11px] text-zinc-300 max-w-[200px] leading-relaxed">V: delay the video track relative to audio. A: delay the audio track relative to video. Use to fix lip-sync issues per source.</span>}>
+                <span className="flex items-center justify-center w-4 h-4 rounded-full border border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-400 transition-colors cursor-help text-[10px] font-bold leading-none shrink-0">i</span>
+              </Tooltip>
+            </div>
+            <div className="flex flex-col border border-zinc-800 rounded overflow-hidden">
+              {assignments.map((assignment) => {
+                const src  = sources.find((s) => s.id === assignment.sourceId)
+                const name = src?.name ?? assignment.mixerInput
+                const vVal = draftOffsets[assignment.mixerInput] ?? 0
+                const aVal = draftAudioOffsets[assignment.mixerInput] ?? 0
+                return (
+                  <div key={assignment.mixerInput} className="flex items-stretch border-b border-zinc-800 last:border-b-0">
+                    <div className="flex items-center px-3 py-2 shrink-0" style={{ ...leftColStyle, wordBreak: 'break-word', lineHeight: 1.4 }}>
+                      <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500">{name}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 p-2 flex-1">
+                      <div className={cn('flex items-center gap-1.5 border rounded px-2 py-1 text-[9px] font-bold uppercase tracking-widest', vVal !== 0 ? 'border-orange-500 text-orange-500' : 'border-zinc-700 bg-zinc-900')}>
+                        <span className="text-zinc-600 shrink-0">V</span>
+                        <SourceOffsetInput label={`${name} video`} draftValue={vVal} onChange={(val) => setDraftOffsets((prev) => ({ ...prev, [assignment.mixerInput]: val }))} />
+                        <span className="text-zinc-600 shrink-0">ms</span>
+                      </div>
+                      <div className={cn('flex items-center gap-1.5 border rounded px-2 py-1 text-[9px] font-bold uppercase tracking-widest', aVal !== 0 ? 'border-orange-500 text-orange-500' : 'border-zinc-700 bg-zinc-900')}>
+                        <span className="text-zinc-600 shrink-0">A</span>
+                        <SourceOffsetInput label={`${name} audio`} draftValue={aVal} onChange={(val) => setDraftAudioOffsets((prev) => ({ ...prev, [assignment.mixerInput]: val }))} />
+                        <span className="text-zinc-600 shrink-0">ms</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* ── Source timing ─────────────────────────────────────────────────────── */}
-      {assignments.length > 0 && (
-        <div className="flex flex-col gap-2 border-t border-[--color-border] pt-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 flex-1">Source timing</span>
-            <span className="text-[10px] text-zinc-600 w-20 text-right">Video (ms)</span>
-            <span className="text-[10px] text-zinc-600 w-20 text-right">Audio (ms)</span>
-          </div>
-          <p className="text-[10px] text-[--color-text-muted] leading-snug -mt-1 mb-1">
-            Positive values delay the source. Use audio delay to trim lipsync without touching video.
-          </p>
-          {assignments.map((assignment) => {
-            const src  = sources.find((s) => s.id === assignment.sourceId)
-            const name = src?.name ?? assignment.mixerInput
-            return (
-              <div key={assignment.mixerInput} className="flex items-center gap-2">
-                <span className="text-[11px] text-[--color-text-primary] flex-1 truncate" title={name}>{name}</span>
-                <SourceOffsetInput
-                  label={`${name} video`}
-                  draftValue={draftOffsets[assignment.mixerInput] ?? 0}
-                  onChange={(val) => setDraftOffsets((prev) => ({ ...prev, [assignment.mixerInput]: val }))}
-                />
-                <SourceOffsetInput
-                  label={`${name} audio`}
-                  draftValue={draftAudioOffsets[assignment.mixerInput] ?? 0}
-                  onChange={(val) => setDraftAudioOffsets((prev) => ({ ...prev, [assignment.mixerInput]: val }))}
-                />
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      <div className="flex justify-end border-t border-[--color-border] pt-3">
+      <div className="flex justify-end pt-3">
         <Button variant="active" size="sm" onClick={handleDone}>Done</Button>
       </div>
     </div>
@@ -443,6 +457,7 @@ export function ControllerPage() {
   const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pgmInput, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction, afvRampUpMs, afvRampDownMs, dskState } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const fetchProductions = useProductionsStore((s) => s.fetchAll)
+  const refreshOneProduction = useProductionsStore((s) => s.refreshOne)
   const fetchSources = useSourcesStore((s) => s.fetchAll)
   const sources = useSourcesStore((s) => s.sources)
   const fetchGraphics = useGraphicsStore((s) => s.fetchAll)
@@ -537,8 +552,9 @@ export function ControllerPage() {
     void audioApi.discoverElements(activeProductionId).then((elements) => {
       if (!cancelled) setElements(elements, activeProductionId)
     }).catch(() => {})
+    void refreshOneProduction(activeProductionId).catch(() => {})
     return () => { cancelled = true }
-  }, [activeProductionId, activeProduction?.status, setElements])
+  }, [activeProductionId, activeProduction?.status, setElements, refreshOneProduction])
 
   const handleCut = useCallback(() => {
     if (pvwPip !== null && pvwPip !== undefined) {
@@ -899,7 +915,7 @@ export function ControllerPage() {
 
         {/* Controller + Audio row */}
         {showBottomRow && (
-          <div className="flex flex-none pt-2 pb-3 gap-0" style={{ height: 352 }}>
+          <div className="flex flex-none pt-2 pb-3 gap-0" style={{ height: 392 }}>
             {panels.controller && (
               <div className="px-3 flex flex-col gap-2 min-w-0 flex-1 h-full">
                 <SectionLabel icon={<ControllerIcon />} onPopOut={activeProductionId ? () => { window.open(`/pane/controller?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('controller')} actions={
@@ -958,56 +974,63 @@ export function ControllerPage() {
 
     {/* ── Audio options modal ──────────────────────────────────────────────── */}
     <Modal open={audioOptionsOpen} title="Audio Options" onClose={() => setAudioOptionsOpen(false)} className="max-w-xs">
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3">
-          <label className="text-xs text-[--color-text-muted] w-20 shrink-0">Ramp Up</label>
-          <input
-            type="number"
-            min={0}
-            max={5000}
-            step={50}
-            value={rampUpMsText}
-            onChange={(e) => {
-              setRampUpMsText(e.target.value)
-            }}
-            onBlur={() => {
-              const parsed = parseInt(rampUpMsText, 10)
-              const clamped = isNaN(parsed) ? afvRampUpMs : Math.max(0, Math.min(5000, parsed))
-              setRampUpMsText(String(clamped))
-              const down = parseInt(rampDownMsText, 10)
-              send({ type: 'AFV_RAMP_SET', rampUpMs: clamped, rampDownMs: isNaN(down) ? afvRampDownMs : Math.max(0, Math.min(5000, down)) })
-            }}
-            className="bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[--color-accent] w-20"
-          />
-          <span className="text-xs text-[--color-text-muted] shrink-0">ms</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <label className="text-xs text-[--color-text-muted] w-20 shrink-0">Ramp Down</label>
-          <input
-            type="number"
-            min={0}
-            max={5000}
-            step={50}
-            value={rampDownMsText}
-            onChange={(e) => {
-              setRampDownMsText(e.target.value)
-            }}
-            onBlur={() => {
-              const parsed = parseInt(rampDownMsText, 10)
-              const clamped = isNaN(parsed) ? afvRampDownMs : Math.max(0, Math.min(5000, parsed))
-              setRampDownMsText(String(clamped))
-              const up = parseInt(rampUpMsText, 10)
-              send({ type: 'AFV_RAMP_SET', rampUpMs: isNaN(up) ? afvRampUpMs : Math.max(0, Math.min(5000, up)), rampDownMs: clamped })
-            }}
-            className="bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[--color-accent] w-20"
-          />
-          <span className="text-xs text-[--color-text-muted] shrink-0">ms</span>
-          <Tooltip title="AFV Ramp" content={
+          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 shrink-0" style={{ width: 80 }}>Ramp Up</span>
+          <div className="flex items-center gap-1.5 border border-zinc-700 rounded bg-zinc-900 px-2 py-1">
+            <input
+              type="number"
+              min={0}
+              max={5000}
+              step={50}
+              value={rampUpMsText}
+              onChange={(e) => { setRampUpMsText(e.target.value) }}
+              onBlur={() => {
+                const parsed = parseInt(rampUpMsText, 10)
+                const clamped = isNaN(parsed) ? afvRampUpMs : Math.max(0, Math.min(5000, parsed))
+                setRampUpMsText(String(clamped))
+                const down = parseInt(rampDownMsText, 10)
+                send({ type: 'AFV_RAMP_SET', rampUpMs: clamped, rampDownMs: isNaN(down) ? afvRampDownMs : Math.max(0, Math.min(5000, down)) })
+              }}
+              className="w-16 bg-transparent border-none text-[9px] font-bold text-orange-500 text-right focus:outline-none"
+            />
+            <span className="text-[9px] font-bold text-zinc-600 shrink-0">ms</span>
+          </div>
+          <Tooltip title="Ramp Up" content={
             <span className="text-[11px] text-zinc-300 max-w-[200px] leading-relaxed">
-              Ramp Up: fade-in time when a channel is brought on-air. Ramp Down: fade-out time when a channel is taken off-air. Applied when audio follows a CUT or transition (default 200 ms each).
+              Fade-in time when a channel is brought on-air after a CUT or transition.
             </span>
           }>
-            <span className="flex items-center justify-center w-4 h-4 rounded-full border border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-400 transition-colors cursor-default text-[10px] font-bold leading-none shrink-0">i</span>
+            <span className="flex items-center justify-center w-4 h-4 rounded-full border border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-400 transition-colors cursor-help text-[10px] font-bold leading-none shrink-0">i</span>
+          </Tooltip>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 shrink-0" style={{ width: 80 }}>Ramp Down</span>
+          <div className="flex items-center gap-1.5 border border-zinc-700 rounded bg-zinc-900 px-2 py-1">
+            <input
+              type="number"
+              min={0}
+              max={5000}
+              step={50}
+              value={rampDownMsText}
+              onChange={(e) => { setRampDownMsText(e.target.value) }}
+              onBlur={() => {
+                const parsed = parseInt(rampDownMsText, 10)
+                const clamped = isNaN(parsed) ? afvRampDownMs : Math.max(0, Math.min(5000, parsed))
+                setRampDownMsText(String(clamped))
+                const up = parseInt(rampUpMsText, 10)
+                send({ type: 'AFV_RAMP_SET', rampUpMs: isNaN(up) ? afvRampUpMs : Math.max(0, Math.min(5000, up)), rampDownMs: clamped })
+              }}
+              className="w-16 bg-transparent border-none text-[9px] font-bold text-orange-500 text-right focus:outline-none"
+            />
+            <span className="text-[9px] font-bold text-zinc-600 shrink-0">ms</span>
+          </div>
+          <Tooltip title="Ramp Down" content={
+            <span className="text-[11px] text-zinc-300 max-w-[200px] leading-relaxed">
+              Fade-out time when a channel is taken off-air after a CUT or transition.
+            </span>
+          }>
+            <span className="flex items-center justify-center w-4 h-4 rounded-full border border-zinc-600 text-zinc-500 hover:text-zinc-300 hover:border-zinc-400 transition-colors cursor-help text-[10px] font-bold leading-none shrink-0">i</span>
           </Tooltip>
         </div>
         <div className="flex justify-end">
@@ -1017,7 +1040,7 @@ export function ControllerPage() {
     </Modal>
 
     {/* ── Controller options modal ─────────────────────────────────────────── */}
-    <Modal open={controllerOptionsOpen} title="Controller Options" onClose={() => setControllerOptionsOpen(false)} className="max-w-3xl">
+    <Modal open={controllerOptionsOpen} title="Controller Options" onClose={() => setControllerOptionsOpen(false)} className="max-w-5xl">
       <ControllerOptionsContent
         controllerOptions={controllerOptions}
         setControllerOptions={setControllerOptions}

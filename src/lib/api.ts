@@ -5,17 +5,24 @@ import { authenticateWithOpenLive, getApiToken, isOnOsc } from './sat.js'
 // Paths that manage their own error toasts — skip global handler
 const SILENT_PATHS = ['/api/v1/status', '/api/v1/reconnect']
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+interface RequestOptions extends RequestInit {
+  // Status codes to treat as success (no toast, no throw). Useful for idempotent deletes.
+  silentStatuses?: number[]
+}
+
+async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   await authenticateWithOpenLive()
   const token = await getApiToken()
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
   const contentHeaders: Record<string, string> = init?.body !== undefined ? { 'Content-Type': 'application/json' } : {}
 
+  const { silentStatuses, ...fetchInit } = init ?? {}
   const res = await fetch(`${BASE}${path}`, {
     headers: { ...contentHeaders, ...authHeaders },
-    ...init,
+    ...fetchInit,
   })
   if (!res.ok) {
+    if (silentStatuses?.includes(res.status)) return undefined as T
     const err = await res.json().catch(() => ({ error: res.statusText }))
     const message = (err as { error?: string }).error ?? res.statusText
     if (!SILENT_PATHS.includes(path)) {
@@ -99,6 +106,8 @@ export interface ApiProduction {
   subscriberCount?: number
   /** Unix ms timestamp when this production will be auto-deactivated due to idle. Set by backend watchdog. */
   idleExpiresAt?: number
+  /** Negotiated input resolutions from Strom, indexed by mixer input position. Null = caps not yet negotiated. */
+  inputResolutions?: Array<{ width: number; height: number } | null>
 }
 
 export interface ProductionConfig {
@@ -128,6 +137,7 @@ type RawProduction = {
   autoDeactivated?: boolean
   subscriberCount?: number
   idleExpiresAt?: number
+  inputResolutions?: Array<{ width: number; height: number } | null>
 }
 
 function normalizeProduction(d: RawProduction): ApiProduction {
@@ -150,6 +160,7 @@ function normalizeProduction(d: RawProduction): ApiProduction {
     autoDeactivated: d.autoDeactivated,
     subscriberCount: d.subscriberCount,
     idleExpiresAt: d.idleExpiresAt,
+    inputResolutions: d.inputResolutions,
   }
 }
 
@@ -192,7 +203,7 @@ export const productionsApi = {
     }),
 
   unassignSource: (id: string, mixerInput: string) =>
-    request<void>(`/api/v1/productions/${id}/sources/${encodeURIComponent(mixerInput)}`, { method: 'DELETE' }),
+    request<void>(`/api/v1/productions/${id}/sources/${encodeURIComponent(mixerInput)}`, { method: 'DELETE', silentStatuses: [404] }),
 
   assignGraphic: (id: string, body: ProductionGraphicAssignment) =>
     request<ProductionGraphicAssignment & { _rev: string }>(`/api/v1/productions/${id}/graphics`, {

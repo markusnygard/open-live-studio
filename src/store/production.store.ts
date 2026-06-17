@@ -108,6 +108,8 @@ interface ProductionActions {
   applySourceOffset: (mixerInput: string, offsetMs: number) => void
   /** Server-authoritative audio offset setter — called by WS handler on SOURCE_AUDIO_OFFSET_STATE */
   applySourceAudioOffset: (mixerInput: string, offsetMs: number) => void
+  /** Clear all source offsets — called on PRODUCTION_DEACTIVATED */
+  resetSourceOffsets: () => void
   /** Server-authoritative AFV ramp setter — called by WS handler on AFV_RAMP_STATE */
   applyAfvRamp: (rampUpMs: number, rampDownMs: number) => void
   applyPipState: (pgmPip: number | null, pvwPip: number | null, pips: PipConfig[]) => void
@@ -224,6 +226,12 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       applySourceAudioOffset: (mixerInput, offsetMs) =>
         set((state) => {
           state.sourceAudioOffsets[mixerInput] = offsetMs
+        }),
+
+      resetSourceOffsets: () =>
+        set((state) => {
+          state.sourceOffsets = {}
+          state.sourceAudioOffsets = {}
         }),
 
       applyAfvRamp: (rampUpMs, rampDownMs) =>

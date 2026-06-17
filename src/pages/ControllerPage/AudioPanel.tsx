@@ -1211,7 +1211,7 @@ export function AudioPanel({ send, numAuxBuses = 2, numGroups = 2, showEbuMain =
     <FaderDimsCtx.Provider value={{ faderH: fH, faderContainerH: fCH }}>
     <div
       className="border border-zinc-800 overflow-hidden flex items-stretch"
-      style={{ background: '#0d0d0d', minHeight: 300 }}
+      style={{ background: '#0d0d0d', minHeight: fCH + 60 }}
     >
       {/* Tab selector — vertical, left edge */}
       <div className="flex flex-col shrink-0 border-r border-zinc-800" style={{ width: 20 }}>

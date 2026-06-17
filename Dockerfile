@@ -8,13 +8,13 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY . .
-RUN pnpm build
+
+ARG OPEN_LIVE_URL
+ARG OSC_PAT
+RUN OPEN_LIVE_URL=$OPEN_LIVE_URL OSC_PAT=$OSC_PAT pnpm build
 
 # Stage 2: serve with nginx
 FROM nginx:1.27-alpine
-
-# Install jq for safe JSON encoding in entrypoint
-RUN apk add --no-cache jq
 
 # Remove default nginx static assets
 RUN rm -rf /usr/share/nginx/html/*
@@ -23,29 +23,20 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /app/dist /usr/share/nginx/html
 
 # nginx config — serve index.html for all routes (SPA fallback)
-RUN printf 'server {\n\
-    listen %PORT%;\n\
-    root /usr/share/nginx/html;\n\
-    index index.html;\n\
-    add_header X-Frame-Options "SAMEORIGIN" always;\n\
-    location = /env-config.js {\n\
-        add_header Cache-Control "no-store, no-cache, must-revalidate" always;\n\
-        add_header Pragma "no-cache" always;\n\
-        add_header X-Robots-Tag "noindex" always;\n\
-        expires off;\n\
-    }\n\
-    location / {\n\
-        try_files $uri $uri/ /index.html;\n\
-    }\n\
-}\n' > /etc/nginx/conf.d/default.conf.template
-
-# Entrypoint: inject runtime env vars then start nginx
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+COPY <<'EOF' /etc/nginx/conf.d/default.conf.template
+server {
+    listen %PORT%;
+    root /usr/share/nginx/html;
+    index index.html;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+EOF
 
 EXPOSE 8080
 
 ENV PORT=8080
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["/bin/sh", "-c", "sed s/%PORT%/$PORT/ /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
