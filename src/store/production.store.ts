@@ -100,6 +100,8 @@ interface ProductionState {
   inputEffects: Record<number, VideoEffect>
   /** Master output video effect. */
   masterEffect: VideoEffect
+  /** Set when a PRODUCTION_DEACTIVATED message is received while this client is in the studio. */
+  deactivatedExternally: boolean
 }
 
 interface ProductionActions {
@@ -126,6 +128,7 @@ interface ProductionActions {
   setPvwPip: (pip: number | null) => void
   /** Server-authoritative FX state setter — called by WS handler on FX_STATE */
   applyFxState: (fxAvailable: boolean, inputEffects: VideoEffect[], masterEffect: VideoEffect) => void
+  setDeactivatedExternally: (value: boolean) => void
 }
 
 export const useProductionStore = create<ProductionState & ProductionActions>()(
@@ -150,6 +153,7 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
       fxAvailable: false,
       inputEffects: {},
       masterEffect: { type: 'none' as const },
+      deactivatedExternally: false,
 
       // Actions
       cut: () =>
@@ -273,6 +277,9 @@ export const useProductionStore = create<ProductionState & ProductionActions>()(
           state.inputEffects = Object.fromEntries(inputEffects.map((e, i) => [i, e]))
           state.masterEffect = masterEffect
         }),
+
+      setDeactivatedExternally: (value) =>
+        set((state) => { state.deactivatedExternally = value }),
     })),
     { name: 'production', enabled: import.meta.env.DEV },
   ),

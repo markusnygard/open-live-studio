@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { ProductionsPanel } from '@/pages/SetupPage/ProductionsPanel'
 import { ConfigsPanel } from '@/pages/SetupPage/ConfigsPanel'
+import { Modal } from '@/components/ui/Modal'
+import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { useProductionStore } from '@/store/production.store'
 
 type Tab = 'productions' | 'configs'
 
@@ -13,6 +16,8 @@ const TABS: { id: Tab; label: string }[] = [
 
 export function ProductionsPage() {
   const [activeTab, setActiveTab] = useState<Tab>('productions')
+  const deactivatedExternally = useProductionStore((s) => s.deactivatedExternally)
+  const setDeactivatedExternally = useProductionStore((s) => s.setDeactivatedExternally)
 
   return (
     <div className="flex flex-col h-full">
@@ -42,6 +47,19 @@ export function ProductionsPage() {
         {activeTab === 'productions' && <ProductionsPanel />}
         {activeTab === 'configs' && <ConfigsPanel />}
       </div>
+
+      {deactivatedExternally && (
+        <Modal open title="Production deactivated" onClose={() => setDeactivatedExternally(false)} className="max-w-sm">
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-[--color-text-primary]">
+              This production was deactivated by another user.
+            </p>
+            <div className="flex justify-end">
+              <Button onClick={() => setDeactivatedExternally(false)}>OK</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

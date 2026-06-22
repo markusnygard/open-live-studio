@@ -74,9 +74,10 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const resetSourceOffsets     = useProductionStore((s) => s.resetSourceOffsets)
   const applyAfvRamp           = useProductionStore((s) => s.applyAfvRamp)
   const applyPipState          = useProductionStore((s) => s.applyPipState)
-  const applyFxState           = useProductionStore((s) => s.applyFxState)
-  const addToast               = useToastStore((s) => s.addToast)
-  const markInactive           = useProductionsStore((s) => s.markInactive)
+  const applyFxState              = useProductionStore((s) => s.applyFxState)
+  const setDeactivatedExternally  = useProductionStore((s) => s.setDeactivatedExternally)
+  const addToast                  = useToastStore((s) => s.addToast)
+  const markInactive              = useProductionsStore((s) => s.markInactive)
 
   const actionsRef = useRef({
     setPgm, setPvw, setTBarPosition, setDskState,
@@ -86,7 +87,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
     applySourceOffset, applySourceAudioOffset, resetSourceOffsets, applyAfvRamp,
-    applyPipState, applyFxState, addToast, markInactive,
+    applyPipState, applyFxState, setDeactivatedExternally, addToast, markInactive,
   })
   actionsRef.current = {
     setPgm, setPvw, setTBarPosition, setDskState,
@@ -96,7 +97,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
     applyMeter, applyLoudness,
     applySourceOffset, applySourceAudioOffset, resetSourceOffsets, applyAfvRamp,
-    applyPipState, applyFxState, addToast, markInactive,
+    applyPipState, applyFxState, setDeactivatedExternally, addToast, markInactive,
   }
 
   useEffect(() => {
@@ -252,6 +253,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
             case 'PRODUCTION_DEACTIVATED':
               if (productionId) a.markInactive(productionId)
               a.resetSourceOffsets()
+              a.setDeactivatedExternally(true)
               break
             case 'ERROR':
               if (typeof msg['error'] === 'string') {

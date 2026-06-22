@@ -817,7 +817,7 @@ export function ProductionsPanel() {
   const [addOpen, setAddOpen] = useState(false)
   const [optionsId, setOptionsId] = useState<string | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
-  const [deactivateTargetId, setDeactivateTargetId] = useState<string | null>(null)
+  const [deactivateTarget, setDeactivateTarget] = useState<Production | null>(null)
   const [activationError, setActivationError] = useState<{ prodId: string; message: string } | null>(null)
 
   async function handleDelete(id: string) {
@@ -826,9 +826,13 @@ export function ProductionsPanel() {
     setDeleteTargetId(null)
   }
 
+  function handleDeactivateClick(id: string) {
+    const prod = productions.find((p) => p.id === id) ?? null
+    setDeactivateTarget(prod)
+  }
+
   const optionsProd = optionsId ? productions.find((p) => p.id === optionsId) : null
   const deleteTarget = deleteTargetId ? productions.find((p) => p.id === deleteTargetId) : null
-  const deactivateTarget = deactivateTargetId ? productions.find((p) => p.id === deactivateTargetId) : null
 
   return (
     <div className="flex flex-col gap-3">
@@ -1016,7 +1020,7 @@ export function ProductionsPanel() {
                     size="sm"
                     variant="ghost"
                     disabled={isActivating || isDeactivating}
-                    onClick={(e) => { e.stopPropagation(); setDeactivateTargetId(prod.id) }}
+                    onClick={(e) => { e.stopPropagation(); handleDeactivateClick(prod.id) }}
                     className="text-orange-500 hover:text-orange-400 border-transparent"
                   >
                     {isDeactivating ? 'De-activating…' : 'Deactivate'}
@@ -1070,19 +1074,22 @@ export function ProductionsPanel() {
 
       {/* Deactivate confirmation modal */}
       {deactivateTarget && (
-        <Modal open title="Deactivate Production" onClose={() => setDeactivateTargetId(null)} className="max-w-sm">
+        <Modal open title="Deactivate Production" onClose={() => setDeactivateTarget(null)} className="max-w-sm">
           <div className="flex flex-col gap-4">
             <p className="text-sm text-[--color-text-primary]">
               Deactivate <span className="font-semibold">{deactivateTarget.name}</span>? This will stop the live production.
             </p>
+            <p className="text-sm text-[--color-text-secondary]">
+              Active users: <span className={(deactivateTarget.subscriberCount ?? 0) > 0 ? 'font-semibold text-orange-400' : ''}>{deactivateTarget.subscriberCount ?? 0}</span>
+            </p>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setDeactivateTargetId(null)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setDeactivateTarget(null)}>Cancel</Button>
               <Button
                 variant="danger"
                 onClick={() => {
                   void updateStatus(deactivateTarget.id, 'inactive')
                   setActiveProduction(null)
-                  setDeactivateTargetId(null)
+                  setDeactivateTarget(null)
                 }}
               >
                 Deactivate

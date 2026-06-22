@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
-import { useSearchParams } from 'react-router'
+import { useSearchParams, useNavigate } from 'react-router'
 import { useWebRTC } from '@/hooks/useWebRTC'
 import { useControllerWs } from '@/hooks/useControllerWs'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -460,7 +460,7 @@ function ControllerOptionsContent({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export function ControllerPage() {
-  const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pgmInput, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction, afvRampUpMs, afvRampDownMs, dskState } = useProductionStore()
+  const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pgmInput, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction, afvRampUpMs, afvRampDownMs, dskState, deactivatedExternally, setDeactivatedExternally } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const fetchProductions = useProductionsStore((s) => s.fetchAll)
   const refreshOneProduction = useProductionsStore((s) => s.refreshOne)
@@ -541,6 +541,12 @@ export function ControllerPage() {
     const active = [...productions].reverse().find((p) => p.status === 'active')
     if (active) setActiveProduction(active.id)
   }, [productions, activeProductionId, setActiveProduction, searchParams])
+
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (!deactivatedExternally) return
+    void navigate('/productions')
+  }, [deactivatedExternally, navigate])
 
   // WebRTC only when multiviewer is enabled — passing null triggers clean disconnect
   useWebRTC(panels.multiviewer ? (selectedMvUrl ?? whepEndpoint ?? null) : null)
