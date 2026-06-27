@@ -49,7 +49,7 @@ async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export type StreamType = 'srt' | 'efp' | 'whip' | 'test1' | 'test2' | 'html'
+export type StreamType = 'srt' | 'efp' | 'whip' | 'test1' | 'test2' | 'html' | 'ndi'
 
 export interface ApiSource {
   id: string
@@ -71,7 +71,7 @@ export interface ProductionGraphicAssignment {
   dskInput: string
 }
 
-export type OutputType = 'mpegtssrt' | 'efpsrt' | 'whep'
+export type OutputType = 'mpegtssrt' | 'efpsrt' | 'whep' | 'ndi' | 'sdi'
 
 export interface ApiOutput {
   id: string
@@ -242,6 +242,28 @@ export const sourcesApi = {
 
   remove: (id: string) =>
     request<void>(`/api/v1/sources/${id}`, { method: 'DELETE' }),
+}
+
+export interface NdiSource {
+  id: string
+  name: string
+  device_class: string
+  category: string
+  provider: string
+  properties: Record<string, string>
+}
+
+export const ndiApi = {
+  sources: () => request<NdiSource[]>('/api/v1/ndi/sources'),
+}
+
+export interface Capabilities {
+  ndi: boolean
+  sdi: boolean
+}
+
+export const capabilitiesApi = {
+  get: () => request<Capabilities>('/api/v1/capabilities'),
 }
 
 // --------------- Macro types ---------------

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useSourcesStore } from '@/store/sources.store'
 import { useProductionsStore } from '@/store/productions.store'
-import type { StreamType } from '@/lib/api'
+import type { StreamType, NdiSource } from '@/lib/api'
+import { ndiApi, capabilitiesApi } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { StatusDot } from '@/components/ui/StatusDot'
 import { Modal } from '@/components/ui/Modal'
@@ -20,6 +21,7 @@ const STREAM_TYPE_LABELS: Record<StreamType, string> = {
   test1: 'Pinwheel',
   test2: 'Colors',
   html: 'HTML',
+  ndi: 'NDI',
 }
 
 const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
@@ -29,6 +31,7 @@ const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
   test1: false,
   test2: false,
   html: true,
+  ndi: true,
 }
 
 const STREAM_TYPE_HAS_LATENCY: Record<StreamType, boolean> = {
@@ -38,13 +41,15 @@ const STREAM_TYPE_HAS_LATENCY: Record<StreamType, boolean> = {
   test1: false,
   test2: false,
   html: false,
+  ndi: false,
 }
 
 const STREAM_TYPE_ADDRESS_PLACEHOLDER: Partial<Record<StreamType, string>> = {
   html: 'https://example.com/overlay',
+  ndi: '192.168.1.10:5961',
 }
 
-const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html']
+const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html', 'ndi']
 
 export function SourcesPanel() {
   const { sources, isLoading, lastFetchedAt, removeSource, addSource, updateSource, fetchAll } = useSourcesStore()
@@ -55,6 +60,14 @@ export function SourcesPanel() {
     const id = setInterval(() => void fetchAll(), 15000)
     return () => clearInterval(id)
   }, [fetchAll])
+
+  const [creatableTypes, setCreatableTypes] = useState<StreamType[]>(['srt', 'efp', 'html'])
+
+  useEffect(() => {
+    capabilitiesApi.get().then((caps) => {
+      setCreatableTypes(['srt', 'efp', 'html', ...(caps.ndi ? ['ndi' as StreamType] : [])])
+    }).catch(() => setCreatableTypes(['srt', 'efp', 'html', 'ndi']))
+  }, [])
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [editTarget, setEditTarget] = useState<{ id: string; name: string; address: string; latency: string; streamType: StreamType } | null>(null)
@@ -64,6 +77,8 @@ export function SourcesPanel() {
   const [newLatency, setNewLatency] = useState('')
   const [addAddressError, setAddAddressError] = useState<string | null>(null)
   const [editAddressError, setEditAddressError] = useState<string | null>(null)
+  const [ndiSources, setNdiSources] = useState<NdiSource[]>([])
+  const [ndiLoading, setNdiLoading] = useState(false)
 
   // Source IDs currently assigned to an active or activating production
   const activeSourceIds = new Set(
@@ -72,6 +87,15 @@ export function SourcesPanel() {
       .flatMap((p) => p.sources.map((s) => s.sourceId)),
   )
 
+  useEffect(() => {
+    if (newStreamType !== 'ndi' && (editTarget?.streamType) !== 'ndi') return
+    setNdiLoading(true)
+    ndiApi.sources()
+      .then(setNdiSources)
+      .catch(() => setNdiSources([]))
+      .finally(() => setNdiLoading(false))
+  }, [newStreamType, editTarget?.streamType, addOpen])
+
   function validateAddress(address: string, streamType: StreamType): string | null {
     if (!STREAM_TYPE_HAS_ADDRESS[streamType]) return null
     if (!address.trim()) return 'Address is required'
@@ -79,6 +103,8 @@ export function SourcesPanel() {
       if (address.startsWith('data:text/html')) return null
       try { const u = new URL(address); if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error() }
       catch { return 'Must be a valid http:// or https:// URL, or a data:text/html URI' }
+    } else if (streamType === 'ndi' || streamType === 'sdi') {
+      return null  // Any source name or device number is valid
     } else {
       if (!/^srt:\/\/[^?#]*:\d+/.test(address.trim())) return 'Must be a valid srt:// URI'
     }
@@ -271,7 +297,7 @@ export function SourcesPanel() {
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Stream Type</label>
             <div className="grid grid-cols-2 gap-2">
-              {CREATABLE_STREAM_TYPES.map((t) => (
+              {creatableTypes.map((t) => (
                 <button
                   key={t}
                   type="button"
@@ -290,6 +316,27 @@ export function SourcesPanel() {
           {STREAM_TYPE_HAS_ADDRESS[newStreamType] && (
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Address</label>
+              {newStreamType === 'ndi' && (
+                <div className="mb-2">
+                  <label className="text-[10px] text-[--color-text-muted] uppercase block mb-1">
+                    Discovered NDI Sources {ndiLoading && <span className="text-[--color-accent]">(scanning…)</span>}
+                  </label>
+                  <select
+                    value=""
+                    onChange={(e) => { if (e.target.value) setNewAddress(e.target.value) }}
+                    className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500"
+                  >
+                    <option value="">-- select discovered source --</option>
+                    {ndiSources.map((n) => {
+                      const url = n.properties?.['url-address'] || n.name
+                      return <option key={n.id} value={url}>{n.name} ({url})</option>
+                    })}
+                  </select>
+                  {!ndiLoading && ndiSources.length === 0 && (
+                    <p className="text-[10px] text-[--color-text-muted] mt-1">No NDI sources discovered. Type an address manually below (e.g. 192.168.1.10:5961).</p>
+                  )}
+                </div>
+              )}
               <input
                 type="text"
                 value={newAddress}

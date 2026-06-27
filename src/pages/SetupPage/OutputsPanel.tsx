@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useOutputsStore, type OutputType } from '@/store/outputs.store'
 import { useProductionsStore } from '@/store/productions.store'
+import { capabilitiesApi } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { StatusDot } from '@/components/ui/StatusDot'
-
-const CREATABLE_OUTPUT_TYPES: OutputType[] = ['mpegtssrt', 'efpsrt']
 
 const OUTPUT_TYPE_LABELS: Record<OutputType, string> = {
   mpegtssrt: 'MPEG-TS/SRT',
   efpsrt: 'EFP/SRT',
   whep: 'WHEP',
+  ndi: 'NDI',
+  sdi: 'SDI',
 }
 
 function timeSince(ts: number): string {
@@ -32,6 +33,14 @@ export function OutputsPanel() {
     return () => clearInterval(id)
   }, [fetchAll])
 
+  const [creatableTypes, setCreatableTypes] = useState<OutputType[]>(['mpegtssrt', 'efpsrt'])
+
+  useEffect(() => {
+    capabilitiesApi.get().then((caps) => {
+      setCreatableTypes(['mpegtssrt', 'efpsrt', ...(caps.ndi ? ['ndi' as OutputType] : []), ...(caps.sdi ? ['sdi' as OutputType] : [])])
+    }).catch(() => setCreatableTypes(['mpegtssrt', 'efpsrt', 'ndi', 'sdi']))
+  }, [])
+
   const activeOutputIds = new Set(
     productions
       .filter((p) => p.status === 'active' || p.status === 'activating')
@@ -39,7 +48,7 @@ export function OutputsPanel() {
   )
 
   const [addOpen, setAddOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<{ id: string; name: string; url: string } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; url: string; outputType: OutputType } | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [addUrlError, setAddUrlError] = useState<string | null>(null)
@@ -60,25 +69,32 @@ export function OutputsPanel() {
     return /^srt:\/\/[^?#]*:\d+/.test(s.trim())
   }
 
+  function typeNeedsUrl(t: OutputType) {
+    return t === 'mpegtssrt' || t === 'efpsrt'
+  }
+
   async function handleAdd() {
-    if (!newName.trim() || !newUrl.trim()) return
-    if (!isValidSrtUrl(newUrl.trim())) { setAddUrlError('Must be a valid srt:// URI'); return }
-    const duplicate = outputs.find((o) => o.url?.trim() === newUrl.trim())
-    if (duplicate) { setAddUrlError(`Address already used by "${duplicate.name}"`); return }
-    await addOutput({ name: newName.trim(), outputType: newType, url: newUrl.trim() })
+    if (!newName.trim()) return
+    if (typeNeedsUrl(newType)) {
+      if (!newUrl.trim()) { setAddUrlError('SRT URI is required'); return }
+      if (!isValidSrtUrl(newUrl.trim())) { setAddUrlError('Must be a valid srt:// URI'); return }
+      const duplicate = outputs.find((o) => o.url?.trim() === newUrl.trim())
+      if (duplicate) { setAddUrlError(`Address already used by "${duplicate.name}"`); return }
+    }
+    await addOutput({ name: newName.trim(), outputType: newType, url: typeNeedsUrl(newType) ? newUrl.trim() : undefined })
     resetAdd()
     setAddOpen(false)
   }
 
   async function handleEdit() {
     if (!editTarget || !editTarget.name.trim()) return
-    const url = editTarget.url.trim()
-    if (url) {
-      if (!isValidSrtUrl(url)) { setEditUrlError('Must be a valid srt:// URI'); return }
-      const duplicate = outputs.find((o) => o.id !== editTarget.id && o.url?.trim() === url)
+    const isSrt = typeNeedsUrl(editTarget.outputType)
+    if (isSrt && editTarget.url.trim()) {
+      if (!isValidSrtUrl(editTarget.url.trim())) { setEditUrlError('Must be a valid srt:// URI'); return }
+      const duplicate = outputs.find((o) => o.id !== editTarget.id && o.url?.trim() === editTarget.url.trim())
       if (duplicate) { setEditUrlError(`Address already used by "${duplicate.name}"`); return }
     }
-    await updateOutput(editTarget.id, { name: editTarget.name.trim(), url: url || undefined })
+    await updateOutput(editTarget.id, { name: editTarget.name.trim(), url: isSrt ? editTarget.url.trim() || undefined : undefined })
     setEditUrlError(null)
     setEditTarget(null)
   }
@@ -118,7 +134,7 @@ export function OutputsPanel() {
                   ? 'border-[--color-border] hover:border-zinc-600 cursor-not-allowed'
                   : 'border-[--color-border] hover:border-orange-500 cursor-pointer'
               }`}
-              onClick={() => !inActiveProd && setEditTarget({ id: o.id, name: o.name, url: o.url ?? '' })}
+              onClick={() => !inActiveProd && setEditTarget({ id: o.id, name: o.name, url: o.url ?? '', outputType: o.outputType })}
             >
               <StatusDot color={inActiveProd ? 'red' : 'gray'} />
               <div className="flex-1 min-w-0">
@@ -135,7 +151,7 @@ export function OutputsPanel() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={(e) => { e.stopPropagation(); !inActiveProd && setEditTarget({ id: o.id, name: o.name, url: o.url ?? '' }) }}
+                onClick={(e) => { e.stopPropagation(); !inActiveProd && setEditTarget({ id: o.id, name: o.name, url: o.url ?? '', outputType: o.outputType }) }}
                 disabled={inActiveProd}
                 className="text-white hover:text-orange-500 disabled:opacity-30 disabled:cursor-not-allowed"
                 title={inActiveProd ? 'Cannot edit output in an active production' : 'Edit output'}
@@ -194,11 +210,11 @@ export function OutputsPanel() {
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Type</label>
             <div className="grid grid-cols-2 gap-2">
-              {CREATABLE_OUTPUT_TYPES.map((t) => (
+              {creatableTypes.map((t) => (
                 <button
                   key={t}
                   type="button"
-                  onClick={() => { setNewType(t); setNewUrl('srt://:43524?mode=listener') }}
+                  onClick={() => { setNewType(t); if (typeNeedsUrl(t)) setNewUrl('srt://:43524?mode=listener'); else setNewUrl('') }}
                   className={`py-2 rounded text-sm border transition-colors ${
                     newType === t
                       ? 'bg-[var(--color-accent)] border-[var(--color-accent)] text-white'
@@ -210,6 +226,7 @@ export function OutputsPanel() {
               ))}
             </div>
           </div>
+          {typeNeedsUrl(newType) && (
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">SRT URI</label>
             <input
@@ -221,9 +238,10 @@ export function OutputsPanel() {
             />
             {addUrlError && <p className="text-xs text-red-400 mt-1">{addUrlError}</p>}
           </div>
+          )}
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => { resetAdd(); setAddOpen(false) }}>Cancel</Button>
-            <Button variant="active" onClick={() => void handleAdd()} disabled={!newName.trim() || !newUrl.trim()}>
+            <Button variant="active" onClick={() => void handleAdd()} disabled={!newName.trim() || (typeNeedsUrl(newType) && !newUrl.trim())}>
               Save
             </Button>
           </div>
@@ -243,6 +261,7 @@ export function OutputsPanel() {
                 className={inputCls}
               />
             </div>
+            {typeNeedsUrl(editTarget.outputType) && (
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">SRT URI</label>
               <input
@@ -253,6 +272,7 @@ export function OutputsPanel() {
               />
               {editUrlError && <p className="text-xs text-red-400 mt-1">{editUrlError}</p>}
             </div>
+            )}
             <div className="flex justify-end gap-2 pt-1">
               <Button variant="ghost" onClick={() => { setEditTarget(null); setEditUrlError(null) }}>Cancel</Button>
               <Button variant="active" onClick={() => void handleEdit()} disabled={!editTarget.name.trim()}>

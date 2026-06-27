@@ -16,7 +16,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api/v1': 'http://localhost:8080',
+      '/api': 'http://open-live:8000',
     },
   },
 })

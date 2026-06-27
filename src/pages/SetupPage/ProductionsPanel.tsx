@@ -26,6 +26,7 @@ const STREAM_TYPE_LABELS = {
   html: 'HTML',
   test1: 'Pinwheel',
   test2: 'Colors',
+  ndi: 'NDI',
 } as const
 
 // ---------------------------------------------------------------------------
@@ -63,7 +64,7 @@ function SlotRow({ index: _index, currentSourceId, canRemove, onChange, onRemove
           }, {}),
         )
           .sort(([a], [b]) => {
-            const ORDER = ['srt', 'efp', 'html', 'whip']
+            const ORDER = ['srt', 'efp', 'ndi', 'html', 'whip']
             const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b)
             if (ai !== -1 && bi !== -1) return ai - bi
             if (ai !== -1) return -1
@@ -142,6 +143,8 @@ function toCallerUrl(url: string, stromHost?: string): string {
 const OUTPUT_TYPE_LABELS: Record<string, string> = {
   mpegtssrt: 'MPEG-TS/SRT',
   efpsrt: 'EFP/SRT',
+  ndi: 'NDI',
+  sdi: 'SDI',
 }
 
 interface OutputSlotRowProps {
@@ -170,7 +173,7 @@ function OutputSlotRow({ value, usedIds, takenByOtherIds, canRemove, onChange, o
             }, {}),
         )
           .sort(([a], [b]) => {
-            const ORDER = ['mpegtssrt', 'efpsrt']
+            const ORDER = ['mpegtssrt', 'efpsrt', 'ndi', 'sdi']
             const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b)
             if (ai !== -1 && bi !== -1) return ai - bi
             if (ai !== -1) return -1

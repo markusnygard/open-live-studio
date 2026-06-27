@@ -99,6 +99,9 @@ export function useWebRTC(whepEndpoint?: string | null): void {
         clientRef.current = null
       }
       setConnectionState('connecting')
+      // Skip WHEP proxy when the endpoint is directly reachable (local/host-mode Strom).
+      // The proxy is only needed when Strom is behind auth (OSC deployments).
+      const needsProxy = !whepEndpoint.startsWith('http://localhost:') && !whepEndpoint.startsWith('http://127.')
       const client = new WhepClient(whepEndpoint, {
         onVideoTrack: (stream) => {
           if (cancelled || generation !== myGen) return
@@ -141,7 +144,7 @@ export function useWebRTC(whepEndpoint?: string | null): void {
           if (disconnectWatchdog) { clearTimeout(disconnectWatchdog); disconnectWatchdog = null }
           triggerRetry()
         },
-      }, { iceServersUrl: `${API_BASE}/api/v1/ice-servers`, proxyUrl: `${API_BASE}/api/v1/whep-proxy`, authToken })
+      }, { iceServersUrl: `${API_BASE}/api/v1/ice-servers`, ...(needsProxy ? { proxyUrl: `${API_BASE}/api/v1/whep-proxy` } : {}), authToken })
       clientRef.current = client
       void client.connect()
     }
