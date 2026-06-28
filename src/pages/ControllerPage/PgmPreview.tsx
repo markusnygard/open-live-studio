@@ -159,8 +159,17 @@ export const PgmPreview = forwardRef<PgmPreviewHandle, PgmPreviewProps>(function
       }
       setConnectionState('connecting')
       setHasVideo(false)
+      // Rewrite localhost WHEP URL to use the server's hostname for LAN access
+      let resolvedEndpoint = whepEndpoint
+      try {
+        const u = new URL(whepEndpoint)
+        if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+          u.hostname = window.location.hostname
+          resolvedEndpoint = u.toString()
+        }
+      } catch { /* keep original */ }
       const client = new WhepClient(
-        whepEndpoint,
+        resolvedEndpoint,
         {
           onVideoTrack: (stream) => {
             if (cancelled || generation !== myGen) return
@@ -204,7 +213,7 @@ export const PgmPreview = forwardRef<PgmPreviewHandle, PgmPreviewProps>(function
             triggerRetry()
           },
         },
-        { iceServersUrl: `${API_BASE}/api/v1/ice-servers`, proxyUrl: `${API_BASE}/api/v1/whep-proxy`, authToken },
+        { iceServersUrl: `${API_BASE}/api/v1/ice-servers`, ...(whepEndpoint && !whepEndpoint.startsWith('http://localhost:') && !whepEndpoint.startsWith('http://127.') ? { proxyUrl: `${API_BASE}/api/v1/whep-proxy` } : {}), authToken },
       )
       clientRef.current = client
       void client.connect()

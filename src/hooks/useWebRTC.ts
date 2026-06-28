@@ -99,10 +99,22 @@ export function useWebRTC(whepEndpoint?: string | null): void {
         clientRef.current = null
       }
       setConnectionState('connecting')
-      // Skip WHEP proxy when the endpoint is directly reachable (local/host-mode Strom).
-      // The proxy is only needed when Strom is behind auth (OSC deployments).
-      const needsProxy = !whepEndpoint.startsWith('http://localhost:') && !whepEndpoint.startsWith('http://127.')
-      const client = new WhepClient(whepEndpoint, {
+      // Rewrite localhost WHEP URL to use the server's hostname for LAN access.
+      // The browser on a remote machine can't reach localhost:8080.
+      let resolvedEndpoint = whepEndpoint
+      try {
+        const u = new URL(whepEndpoint)
+        if (u.hostname === 'localhost' || u.hostname === '127.0.0.1') {
+          u.hostname = window.location.hostname
+          resolvedEndpoint = u.toString()
+        }
+      } catch { /* keep original */ }
+
+      // Skip WHEP proxy when endpoint is directly reachable (localhost / LAN).
+      // In host network mode, Strom's WebRTC ports are on the host IP — the browser
+      // can connect directly. Proxy is needed only for Docker-internal URLs.
+      const needsProxy = !resolvedEndpoint.startsWith('http://localhost:') && !resolvedEndpoint.startsWith('http://127.') && !resolvedEndpoint.startsWith('http://192.168.')
+      const client = new WhepClient(resolvedEndpoint, {
         onVideoTrack: (stream) => {
           if (cancelled || generation !== myGen) return
           setProgramStream(stream, false)
