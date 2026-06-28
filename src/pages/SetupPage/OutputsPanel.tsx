@@ -34,10 +34,12 @@ export function OutputsPanel() {
   }, [fetchAll])
 
   const [creatableTypes, setCreatableTypes] = useState<OutputType[]>(['mpegtssrt', 'efpsrt'])
+  const [sdiDevices, setSdiDevices] = useState(4)
 
   useEffect(() => {
     capabilitiesApi.get().then((caps) => {
       setCreatableTypes(['mpegtssrt', 'efpsrt', ...(caps.ndi ? ['ndi' as OutputType] : []), ...(caps.sdi ? ['sdi' as OutputType] : [])])
+      setSdiDevices(caps.sdiDevices > 0 ? caps.sdiDevices : 4)
     }).catch(() => setCreatableTypes(['mpegtssrt', 'efpsrt', 'ndi', 'sdi']))
   }, [])
 
@@ -73,6 +75,10 @@ export function OutputsPanel() {
     return t === 'mpegtssrt' || t === 'efpsrt'
   }
 
+  function typeNeedsDevice(t: OutputType) {
+    return t === 'sdi'
+  }
+
   async function handleAdd() {
     if (!newName.trim()) return
     if (typeNeedsUrl(newType)) {
@@ -81,7 +87,8 @@ export function OutputsPanel() {
       const duplicate = outputs.find((o) => o.url?.trim() === newUrl.trim())
       if (duplicate) { setAddUrlError(`Address already used by "${duplicate.name}"`); return }
     }
-    await addOutput({ name: newName.trim(), outputType: newType, url: typeNeedsUrl(newType) ? newUrl.trim() : undefined })
+    const url = typeNeedsUrl(newType) ? newUrl.trim() : typeNeedsDevice(newType) ? (newUrl.trim() || '0') : undefined
+    await addOutput({ name: newName.trim(), outputType: newType, url })
     resetAdd()
     setAddOpen(false)
   }
@@ -239,6 +246,24 @@ export function OutputsPanel() {
             {addUrlError && <p className="text-xs text-red-400 mt-1">{addUrlError}</p>}
           </div>
           )}
+          {typeNeedsDevice(newType) && (
+          <div>
+            <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Device Number</label>
+            {sdiDevices > 0 ? (
+            <select
+              value={newUrl || '0'}
+              onChange={(e) => setNewUrl(e.target.value)}
+              className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500"
+            >
+              {[...Array(sdiDevices)].map((_, i) => (
+                <option key={i} value={String(i)}>Device {i}</option>
+              ))}
+            </select>
+            ) : (
+            <p className="text-sm text-[--color-amber]">No DeckLink hardware detected. Connect a card to enable SDI output.</p>
+            )}
+          </div>
+          )}
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => { resetAdd(); setAddOpen(false) }}>Cancel</Button>
             <Button variant="active" onClick={() => void handleAdd()} disabled={!newName.trim() || (typeNeedsUrl(newType) && !newUrl.trim())}>
@@ -271,6 +296,24 @@ export function OutputsPanel() {
                 className={inputCls}
               />
               {editUrlError && <p className="text-xs text-red-400 mt-1">{editUrlError}</p>}
+            </div>
+            )}
+            {typeNeedsDevice(editTarget.outputType) && (
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Device Number</label>
+              {sdiDevices > 0 ? (
+              <select
+                value={editTarget.url || '0'}
+                onChange={(e) => setEditTarget({ ...editTarget, url: e.target.value })}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500"
+              >
+              {[...Array(sdiDevices)].map((_, i) => (
+                <option key={i} value={String(i)}>Device {i}</option>
+              ))}
+              </select>
+              ) : (
+              <p className="text-sm text-[--color-amber]">No DeckLink hardware detected.</p>
+              )}
             </div>
             )}
             <div className="flex justify-end gap-2 pt-1">

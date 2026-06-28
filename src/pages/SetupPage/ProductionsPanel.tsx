@@ -27,6 +27,7 @@ const STREAM_TYPE_LABELS = {
   test1: 'Pinwheel',
   test2: 'Colors',
   ndi: 'NDI',
+  sdi: 'SDI',
 } as const
 
 // ---------------------------------------------------------------------------
@@ -64,7 +65,7 @@ function SlotRow({ index: _index, currentSourceId, canRemove, onChange, onRemove
           }, {}),
         )
           .sort(([a], [b]) => {
-            const ORDER = ['srt', 'efp', 'ndi', 'html', 'whip']
+            const ORDER = ['srt', 'efp', 'ndi', 'sdi', 'html', 'whip']
             const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b)
             if (ai !== -1 && bi !== -1) return ai - bi
             if (ai !== -1) return -1

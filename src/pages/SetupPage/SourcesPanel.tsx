@@ -22,6 +22,7 @@ const STREAM_TYPE_LABELS: Record<StreamType, string> = {
   test2: 'Colors',
   html: 'HTML',
   ndi: 'NDI',
+  sdi: 'SDI',
 }
 
 const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
@@ -32,6 +33,7 @@ const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
   test2: false,
   html: true,
   ndi: true,
+  sdi: true,
 }
 
 const STREAM_TYPE_HAS_LATENCY: Record<StreamType, boolean> = {
@@ -42,14 +44,16 @@ const STREAM_TYPE_HAS_LATENCY: Record<StreamType, boolean> = {
   test2: false,
   html: false,
   ndi: false,
+  sdi: false,
 }
 
 const STREAM_TYPE_ADDRESS_PLACEHOLDER: Partial<Record<StreamType, string>> = {
   html: 'https://example.com/overlay',
   ndi: '192.168.1.10:5961',
+  sdi: '0 (device number)',
 }
 
-const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html', 'ndi']
+const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html', 'ndi', 'sdi']
 
 export function SourcesPanel() {
   const { sources, isLoading, lastFetchedAt, removeSource, addSource, updateSource, fetchAll } = useSourcesStore()
@@ -62,11 +66,16 @@ export function SourcesPanel() {
   }, [fetchAll])
 
   const [creatableTypes, setCreatableTypes] = useState<StreamType[]>(['srt', 'efp', 'html'])
+  const [sdiDevices, setSdiDevices] = useState(4)
 
   useEffect(() => {
     capabilitiesApi.get().then((caps) => {
-      setCreatableTypes(['srt', 'efp', 'html', ...(caps.ndi ? ['ndi' as StreamType] : [])])
-    }).catch(() => setCreatableTypes(['srt', 'efp', 'html', 'ndi']))
+      const types: StreamType[] = ['srt', 'efp', 'html']
+      if (caps.ndi) types.push('ndi')
+      if (caps.sdi) types.push('sdi')
+      setCreatableTypes(types)
+      setSdiDevices(caps.sdiDevices > 0 ? caps.sdiDevices : 4)
+    }).catch(() => setCreatableTypes(['srt', 'efp', 'html', 'ndi', 'sdi']))
   }, [])
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
@@ -252,12 +261,30 @@ export function SourcesPanel() {
             {STREAM_TYPE_HAS_ADDRESS[editTarget.streamType] && (
               <div>
                 <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Address</label>
+                {editTarget.streamType === 'sdi' ? (
+                  <div>
+                    {sdiDevices > 0 ? (
+                    <select
+                      value={editTarget.address || '0'}
+                      onChange={(e) => setEditTarget({ ...editTarget, address: e.target.value })}
+                      className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500"
+                    >
+                      {[...Array(sdiDevices)].map((_, i) => (
+                        <option key={i} value={String(i)}>Device {i}</option>
+                      ))}
+                    </select>
+                    ) : (
+                    <p className="text-sm text-[--color-amber]">No DeckLink hardware detected.</p>
+                    )}
+                  </div>
+                ) : (
                 <input
                   type="text"
                   value={editTarget.address}
                   onChange={(e) => { setEditTarget({ ...editTarget, address: e.target.value }); setEditAddressError(null) }}
                   className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
                 />
+                )}
                 {editAddressError && <p className="text-xs text-red-400 mt-1">{editAddressError}</p>}
               </div>
             )}
@@ -337,6 +364,24 @@ export function SourcesPanel() {
                   )}
                 </div>
               )}
+              {newStreamType === 'sdi' ? (
+                <div>
+                  <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Device</label>
+                  {sdiDevices > 0 ? (
+                  <select
+                    value={newAddress || '0'}
+                    onChange={(e) => setNewAddress(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500"
+                  >
+                    {[...Array(sdiDevices)].map((_, i) => (
+                      <option key={i} value={String(i)}>Device {i}</option>
+                    ))}
+                  </select>
+                  ) : (
+                  <p className="text-sm text-[--color-amber]">No DeckLink hardware detected. Connect a card to enable SDI input.</p>
+                  )}
+                </div>
+              ) : (
               <input
                 type="text"
                 value={newAddress}
@@ -344,7 +389,7 @@ export function SourcesPanel() {
                 placeholder={STREAM_TYPE_ADDRESS_PLACEHOLDER[newStreamType] ?? 'srt://192.168.1.10:9000?mode=caller'}
                 className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500/30"
               />
-              {addAddressError && <p className="text-xs text-red-400 mt-1">{addAddressError}</p>}
+              )}
             </div>
           )}
           {STREAM_TYPE_HAS_LATENCY[newStreamType] && (
