@@ -379,11 +379,16 @@ export function OutputsPanel() {
                   className="px-3 py-2 rounded border border-[--color-border-strong] bg-[--color-surface-2] text-xs text-[--color-text-muted] hover:text-orange-500 whitespace-nowrap">Browse...</button>
               </div>
             </div>
-            {/* Dir picker modal */}
+            {/* Dir picker — shown inline, no nested modal */}
             {dirPickerOpen && (
-              <Modal open title="Choose Directory" onClose={() => setDirPickerOpen(false)}>
-                <DirPicker value={newOutputDir} onChange={(d) => { setNewOutputDir(d); setDirPickerOpen(false) }} onClose={() => setDirPickerOpen(false)} />
-              </Modal>
+            <div className="border border-[--color-border-strong] rounded p-3 bg-[--color-surface-raised]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-[--color-text-muted]">Choose Directory</span>
+                <button type="button" onClick={() => setDirPickerOpen(false)}
+                  className="text-[--color-text-muted] hover:text-[--color-red] text-lg leading-none">&times;</button>
+              </div>
+              <DirPicker value={newOutputDir} onChange={(d) => { setNewOutputDir(d); setDirPickerOpen(false) }} onClose={() => setDirPickerOpen(false)} />
+            </div>
             )}
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Video Source</label>
