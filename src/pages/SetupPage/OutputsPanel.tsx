@@ -7,23 +7,49 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { StatusDot } from '@/components/ui/StatusDot'
 
-// Directory browser for recorder output
+// Directory browser for recorder output — recursive folder navigation
 function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: string) => void; onClose: () => void }) {
   const [dirs, setDirs] = useState<string[]>([])
-  const [custom, setCustom] = useState(value)
-  useEffect(() => {
-    fetch('/api/v1/recorder/dirs').then(r => r.json()).then(d => setDirs(d.dirs || ['recordings'])).catch(() => setDirs(['recordings']))
-  }, [])
+  const [currentPath, setCurrentPath] = useState(value || '')
+  const [parent, setParent] = useState<string | null>(null)
+  const [custom, setCustom] = useState(value || '')
+
+  const loadDir = (p: string) => {
+    fetch(`/api/v1/recorder/dirs?path=${encodeURIComponent(p)}`).then(r => r.json()).then(d => {
+      setDirs(d.dirs || [])
+      setCurrentPath(d.path || p)
+      setParent(d.parent)
+    }).catch(() => setDirs([]))
+  }
+  useEffect(() => { loadDir(value || '') }, [value])
+
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-xs text-[--color-text-muted]">Select a directory or type a new one:</div>
-      <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
-        {dirs.map((d) => (
-          <button key={d} type="button" onClick={() => { onChange(d); onClose() }}
-            className={`px-3 py-1.5 rounded text-xs border transition-colors ${d === value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-[--color-surface-2] border-[--color-border-strong] text-[--color-text-muted] hover:text-orange-500'}`}>
-            {d}
-          </button>
-        ))}
+      <div className="text-xs text-[--color-text-muted]">
+        {currentPath ? <span>/data/{currentPath}</span> : <span>/data</span>}
+      </div>
+      <div className="flex gap-2">
+        {parent !== null && (
+          <button type="button" onClick={() => loadDir(parent || '')}
+            className="px-2 py-1 rounded text-xs border border-[--color-border-strong] bg-[--color-surface-2] text-[--color-text-muted] hover:text-white">..</button>
+        )}
+      </div>
+      <div className="flex flex-col gap-1 max-h-60 overflow-y-auto border border-[--color-border-strong] rounded p-2">
+        {dirs.length === 0 && <div className="text-xs text-[--color-text-muted] p-2">No subdirectories</div>}
+        {dirs.map((d) => {
+          const fullPath = currentPath ? `${currentPath}/${d}` : d
+          const isSelected = fullPath === value
+          return (
+            <div key={d} className="flex items-center gap-2">
+              <button type="button" onClick={() => { onChange(fullPath); onClose() }}
+                className={`flex-1 text-left px-2 py-1 rounded text-xs transition-colors ${isSelected ? 'bg-orange-500 text-white' : 'hover:bg-[--color-surface-2] text-[--color-text-primary]'}`}>
+                📁 {d}
+              </button>
+              <button type="button" onClick={() => loadDir(fullPath)}
+                className="px-2 py-1 rounded text-xs border border-[--color-border-strong] bg-[--color-surface-2] text-[--color-text-muted] hover:text-orange-500">→</button>
+            </div>
+          )
+        })}
       </div>
       <div>
         <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Custom path</label>
@@ -57,13 +83,15 @@ const inputCls = 'w-full px-3 py-2 rounded bg-[--color-surface-raised] border bo
 export function OutputsPanel() {
   const { outputs, isLoading, lastFetchedAt, addOutput, updateOutput, removeOutput, fetchAll } = useOutputsStore()
   const productions = useProductionsStore((s) => s.productions)
+  const fetchProductions = useProductionsStore((s) => s.fetchAll)
   const sources = useSourcesStore((s) => s.sources)
 
   useEffect(() => {
     void fetchAll()
+    void fetchProductions()
     const id = setInterval(() => void fetchAll(), 15000)
     return () => clearInterval(id)
-  }, [fetchAll])
+  }, [fetchAll, fetchProductions])
 
   const [creatableTypes, setCreatableTypes] = useState<OutputType[]>(['mpegtssrt', 'efpsrt', 'recorder'])
   const [sdiDevices, setSdiDevices] = useState(4)
