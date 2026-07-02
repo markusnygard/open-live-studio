@@ -8,10 +8,12 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { StatusDot } from '@/components/ui/StatusDot'
 
-// Directory browser for recorder output — recursive folder navigation
+const MEDIA_ROOT = '/data/media'
+
+// Directory browser for recorder output — starts at /data/media
 function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: string) => void; onClose: () => void }) {
   const [dirs, setDirs] = useState<string[]>([])
-  const [currentPath, setCurrentPath] = useState(value || '')
+  const [currentPath, setCurrentPath] = useState('')
   const [parent, setParent] = useState<string | null>(null)
   const [custom, setCustom] = useState(value || '')
 
@@ -23,27 +25,35 @@ function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: 
         setParent(d.parent)
       }).catch(() => setDirs([]))
   }
-  useEffect(() => { loadDir('') }, [])
+  useEffect(() => { loadDir(MEDIA_ROOT) }, [])
+
+  // Convert absolute filesystem path to recorder-compatible relative path
+  const toRelPath = (absPath: string) => {
+    if (absPath.startsWith(MEDIA_ROOT + '/')) return absPath.slice(MEDIA_ROOT.length + 1)
+    if (absPath === MEDIA_ROOT) return ''
+    return absPath // custom paths as-is
+  }
 
   return (
     <div className="flex flex-col gap-3">
       <div className="text-xs text-[--color-text-muted]">
-        {currentPath ? <span>/{currentPath}</span> : <span>/</span>}
+        {currentPath || MEDIA_ROOT}
       </div>
       <div className="flex gap-2">
-        {parent !== null && (
-          <button type="button" onClick={() => loadDir(parent || '')}
+        {parent !== null && currentPath !== MEDIA_ROOT && (
+          <button type="button" onClick={() => loadDir(parent || MEDIA_ROOT)}
             className="px-2 py-1 rounded text-xs border border-[--color-border-strong] bg-[--color-surface-2] text-[--color-text-muted] hover:text-white">..</button>
         )}
       </div>
       <div className="flex flex-col gap-1 max-h-60 overflow-y-auto border border-[--color-border-strong] rounded p-2">
         {dirs.length === 0 && <div className="text-xs text-[--color-text-muted] p-2">No subdirectories</div>}
         {dirs.map((d) => {
-          const fullPath = currentPath ? `${currentPath}/${d}` : d
-          const isSelected = fullPath === value
+          const fullPath = currentPath ? `${currentPath}/${d}` : `${MEDIA_ROOT}/${d}`
+          const relPath = toRelPath(fullPath)
+          const isSelected = relPath === value
           return (
             <div key={d} className="flex items-center gap-2">
-              <button type="button" onClick={() => { onChange(fullPath); onClose() }}
+              <button type="button" onClick={() => { onChange(relPath); onClose() }}
                 className={`flex-1 text-left px-2 py-1 rounded text-xs transition-colors ${isSelected ? 'bg-orange-500 text-white' : 'hover:bg-[--color-surface-2] text-[--color-text-primary]'}`}>
                 📁 {d}
               </button>
@@ -63,6 +73,8 @@ function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: 
     </div>
   )
 }
+
+// Remove old DirPicker — already replaced above
 
 const OUTPUT_TYPE_LABELS: Record<OutputType, string> = {
   mpegtssrt: 'MPEG-TS/SRT',
