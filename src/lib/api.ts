@@ -71,13 +71,16 @@ export interface ProductionGraphicAssignment {
   dskInput: string
 }
 
-export type OutputType = 'mpegtssrt' | 'efpsrt' | 'whep' | 'ndi' | 'sdi'
+export type OutputType = 'mpegtssrt' | 'efpsrt' | 'whep' | 'ndi' | 'sdi' | 'recorder'
 
 export interface ApiOutput {
   id: string
   name: string
   outputType: OutputType
   url?: string
+  outputDir?: string
+  container?: string
+  audioSource?: string
   createdAt: string
   updatedAt: string
 }

@@ -12,6 +12,7 @@ const OUTPUT_TYPE_LABELS: Record<OutputType, string> = {
   whep: 'WHEP',
   ndi: 'NDI',
   sdi: 'SDI',
+  recorder: 'Recorder',
 }
 
 function timeSince(ts: number): string {
@@ -33,14 +34,14 @@ export function OutputsPanel() {
     return () => clearInterval(id)
   }, [fetchAll])
 
-  const [creatableTypes, setCreatableTypes] = useState<OutputType[]>(['mpegtssrt', 'efpsrt'])
+  const [creatableTypes, setCreatableTypes] = useState<OutputType[]>(['mpegtssrt', 'efpsrt', 'recorder'])
   const [sdiDevices, setSdiDevices] = useState(4)
 
   useEffect(() => {
     capabilitiesApi.get().then((caps) => {
-      setCreatableTypes(['mpegtssrt', 'efpsrt', ...(caps.ndi ? ['ndi' as OutputType] : []), ...(caps.sdi ? ['sdi' as OutputType] : [])])
+      setCreatableTypes(['mpegtssrt', 'efpsrt', 'recorder', ...(caps.ndi ? ['ndi' as OutputType] : []), ...(caps.sdi ? ['sdi' as OutputType] : [])])
       setSdiDevices(caps.sdiDevices > 0 ? caps.sdiDevices : 4)
-    }).catch(() => setCreatableTypes(['mpegtssrt', 'efpsrt', 'ndi', 'sdi']))
+    }).catch(() => setCreatableTypes(['mpegtssrt', 'efpsrt', 'recorder', 'ndi', 'sdi']))
   }, [])
 
   const activeOutputIds = new Set(
@@ -59,11 +60,17 @@ export function OutputsPanel() {
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<OutputType>('mpegtssrt')
   const [newUrl, setNewUrl] = useState('srt://:43524?mode=listener')
+  const [newOutputDir, setNewOutputDir] = useState('recordings')
+  const [newContainer, setNewContainer] = useState('mp4')
+  const [newAudioSource, setNewAudioSource] = useState('pgm')
 
   function resetAdd() {
     setNewName('')
     setNewType('mpegtssrt')
     setNewUrl('srt://:43524?mode=listener')
+    setNewOutputDir('recordings')
+    setNewContainer('mp4')
+    setNewAudioSource('pgm')
     setAddUrlError(null)
   }
 
@@ -88,7 +95,13 @@ export function OutputsPanel() {
       if (duplicate) { setAddUrlError(`Address already used by "${duplicate.name}"`); return }
     }
     const url = typeNeedsUrl(newType) ? newUrl.trim() : typeNeedsDevice(newType) ? (newUrl.trim() || '0') : undefined
-    await addOutput({ name: newName.trim(), outputType: newType, url })
+    const body: Record<string, unknown> = { name: newName.trim(), outputType: newType, url }
+    if (newType === 'recorder') {
+      body.outputDir = newOutputDir
+      body.container = newContainer
+      body.audioSource = newAudioSource
+    }
+    await addOutput(body as { name: string; outputType: OutputType; url?: string; outputDir?: string; container?: string; audioSource?: string })
     resetAdd()
     setAddOpen(false)
   }
@@ -262,6 +275,31 @@ export function OutputsPanel() {
             ) : (
             <p className="text-sm text-[--color-amber]">No DeckLink hardware detected. Connect a card to enable SDI output.</p>
             )}
+          </div>
+          )}
+          {newType === 'recorder' && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Container</label>
+              <select value={newContainer} onChange={(e) => setNewContainer(e.target.value)}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                <option value="mp4">MP4</option>
+                <option value="mkv">Matroska (MKV)</option>
+                <option value="mpegts">MPEG-TS</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Output Directory</label>
+              <input type="text" value={newOutputDir} onChange={(e) => setNewOutputDir(e.target.value)}
+                placeholder="recordings" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Audio Source</label>
+              <select value={newAudioSource} onChange={(e) => setNewAudioSource(e.target.value)}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                <option value="pgm">PGM (Program Mix)</option>
+              </select>
+            </div>
           </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
