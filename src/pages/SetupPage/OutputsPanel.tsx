@@ -26,7 +26,7 @@ function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: 
   return (
     <div className="flex flex-col gap-3">
       <div className="text-xs text-[--color-text-muted]">
-        {currentPath ? <span>/data/{currentPath}</span> : <span>/data</span>}
+        {currentPath ? <span>/{currentPath}</span> : <span>/</span>}
       </div>
       <div className="flex gap-2">
         {parent !== null && (
