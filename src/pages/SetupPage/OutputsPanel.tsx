@@ -7,6 +7,35 @@ import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { StatusDot } from '@/components/ui/StatusDot'
 
+// Directory browser for recorder output
+function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: string) => void; onClose: () => void }) {
+  const [dirs, setDirs] = useState<string[]>([])
+  const [custom, setCustom] = useState(value)
+  useEffect(() => {
+    fetch('/api/v1/recorder/dirs').then(r => r.json()).then(d => setDirs(d.dirs || ['recordings'])).catch(() => setDirs(['recordings']))
+  }, [])
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="text-xs text-[--color-text-muted]">Select a directory or type a new one:</div>
+      <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto">
+        {dirs.map((d) => (
+          <button key={d} type="button" onClick={() => { onChange(d); onClose() }}
+            className={`px-3 py-1.5 rounded text-xs border transition-colors ${d === value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-[--color-surface-2] border-[--color-border-strong] text-[--color-text-muted] hover:text-orange-500'}`}>
+            {d}
+          </button>
+        ))}
+      </div>
+      <div>
+        <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Custom path</label>
+        <input type="text" value={custom} onChange={(e) => setCustom(e.target.value)}
+          placeholder="recordings" className={inputCls} onKeyDown={(e) => { if (e.key === 'Enter') { onChange(custom); onClose() } }} />
+        <button type="button" onClick={() => { onChange(custom); onClose() }}
+          className="mt-2 px-3 py-1 text-xs rounded border border-[--color-border-strong] bg-[--color-surface-2] text-[--color-text-primary] hover:border-orange-500">Use</button>
+      </div>
+    </div>
+  )
+}
+
 const OUTPUT_TYPE_LABELS: Record<OutputType, string> = {
   mpegtssrt: 'MPEG-TS/SRT',
   efpsrt: 'EFP/SRT',
@@ -68,6 +97,7 @@ export function OutputsPanel() {
   const [newVideoSource, setNewVideoSource] = useState('pgm')
   const [recorderProdId, setRecorderProdId] = useState('')
   const [recorderSources, setRecorderSources] = useState<Array<{ sourceId: string; mixerInput: string; name: string }>>([])
+  const [dirPickerOpen, setDirPickerOpen] = useState(false)
 
   // Fetch production sources when a production is selected for recorder
   useEffect(() => {
@@ -91,6 +121,7 @@ export function OutputsPanel() {
     setNewAudioSource('pgm')
     setNewVideoSource('pgm')
     setRecorderProdId('')
+    setDirPickerOpen(false)
     setAddUrlError(null)
   }
 
@@ -311,9 +342,19 @@ export function OutputsPanel() {
             </div>
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Output Directory</label>
-              <input type="text" value={newOutputDir} onChange={(e) => setNewOutputDir(e.target.value)}
-                placeholder="recordings" className={inputCls} />
+              <div className="flex gap-2">
+                <input type="text" value={newOutputDir} onChange={(e) => setNewOutputDir(e.target.value)}
+                  placeholder="recordings" className={inputCls + ' flex-1'} />
+                <button type="button" onClick={() => setDirPickerOpen(true)}
+                  className="px-3 py-2 rounded border border-[--color-border-strong] bg-[--color-surface-2] text-xs text-[--color-text-muted] hover:text-orange-500 whitespace-nowrap">Browse...</button>
+              </div>
             </div>
+            {/* Dir picker modal */}
+            {dirPickerOpen && (
+              <Modal open title="Choose Directory" onClose={() => setDirPickerOpen(false)}>
+                <DirPicker value={newOutputDir} onChange={(d) => { setNewOutputDir(d); setDirPickerOpen(false) }} onClose={() => setDirPickerOpen(false)} />
+              </Modal>
+            )}
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Video Source</label>
               <select value={recorderProdId} onChange={(e) => { setRecorderProdId(e.target.value); setNewVideoSource('pgm') }}
@@ -329,6 +370,7 @@ export function OutputsPanel() {
               <select value={newVideoSource} onChange={(e) => setNewVideoSource(e.target.value)}
                 className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
                 <option value="pgm">PGM (Program Feed)</option>
+                <option value="pgm_clean">Clean PGM (no DSK)</option>
                 {recorderSources.map((s) => (
                   <option key={s.sourceId} value={s.sourceId}>{s.name}</option>
                 ))}
