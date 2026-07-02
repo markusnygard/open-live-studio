@@ -10,7 +10,7 @@ interface RequestOptions extends RequestInit {
   silentStatuses?: number[]
 }
 
-async function request<T>(path: string, init?: RequestOptions): Promise<T> {
+export async function request<T>(path: string, init?: RequestOptions): Promise<T> {
   await authenticateWithOpenLive()
   const token = await getApiToken()
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}

@@ -3,6 +3,7 @@ import { useOutputsStore, type OutputType } from '@/store/outputs.store'
 import { useProductionsStore } from '@/store/productions.store'
 import { useSourcesStore } from '@/store/sources.store'
 import { capabilitiesApi, productionsApi } from '@/lib/api'
+import { request } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { StatusDot } from '@/components/ui/StatusDot'
@@ -15,11 +16,12 @@ function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: 
   const [custom, setCustom] = useState(value || '')
 
   const loadDir = (p: string) => {
-    fetch(`/api/v1/recorder/dirs?path=${encodeURIComponent(p)}`).then(r => r.json()).then(d => {
-      setDirs(d.dirs || [])
-      setCurrentPath(d.path || p)
-      setParent(d.parent)
-    }).catch(() => setDirs([]))
+    request<{ dirs: string[]; path: string; parent: string | null; root: string }>(`/api/v1/recorder/dirs?path=${encodeURIComponent(p)}`)
+      .then(d => {
+        setDirs(d.dirs || [])
+        setCurrentPath(d.path || p)
+        setParent(d.parent)
+      }).catch(() => setDirs([]))
   }
   useEffect(() => { loadDir(value || '') }, [value])
 
