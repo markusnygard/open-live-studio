@@ -23,7 +23,7 @@ function DirPicker({ value, onChange, onClose }: { value: string; onChange: (d: 
         setParent(d.parent)
       }).catch(() => setDirs([]))
   }
-  useEffect(() => { loadDir(value || '') }, [value])
+  useEffect(() => { loadDir('') }, [])
 
   return (
     <div className="flex flex-col gap-3">
