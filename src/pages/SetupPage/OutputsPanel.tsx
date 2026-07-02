@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useOutputsStore, type OutputType } from '@/store/outputs.store'
 import { useProductionsStore } from '@/store/productions.store'
-import { capabilitiesApi } from '@/lib/api'
+import { useSourcesStore } from '@/store/sources.store'
+import { capabilitiesApi, productionsApi } from '@/lib/api'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { StatusDot } from '@/components/ui/StatusDot'
@@ -27,6 +28,7 @@ const inputCls = 'w-full px-3 py-2 rounded bg-[--color-surface-raised] border bo
 export function OutputsPanel() {
   const { outputs, isLoading, lastFetchedAt, addOutput, updateOutput, removeOutput, fetchAll } = useOutputsStore()
   const productions = useProductionsStore((s) => s.productions)
+  const sources = useSourcesStore((s) => s.sources)
 
   useEffect(() => {
     void fetchAll()
@@ -63,6 +65,22 @@ export function OutputsPanel() {
   const [newOutputDir, setNewOutputDir] = useState('recordings')
   const [newContainer, setNewContainer] = useState('mp4')
   const [newAudioSource, setNewAudioSource] = useState('pgm')
+  const [newVideoSource, setNewVideoSource] = useState('pgm')
+  const [recorderProdId, setRecorderProdId] = useState('')
+  const [recorderSources, setRecorderSources] = useState<Array<{ sourceId: string; mixerInput: string; name: string }>>([])
+
+  // Fetch production sources when a production is selected for recorder
+  useEffect(() => {
+    if (!recorderProdId) { setRecorderSources([]); return }
+    productionsApi.get(recorderProdId).then((prod) => {
+      const assignments = prod.sources ?? []
+      const named = assignments.map((a) => {
+        const src = sources.find((s) => s.id === a.sourceId)
+        return { sourceId: a.sourceId, mixerInput: a.mixerInput, name: src?.name ?? a.mixerInput }
+      })
+      setRecorderSources(named)
+    }).catch(() => setRecorderSources([]))
+  }, [recorderProdId, sources])
 
   function resetAdd() {
     setNewName('')
@@ -71,6 +89,8 @@ export function OutputsPanel() {
     setNewOutputDir('recordings')
     setNewContainer('mp4')
     setNewAudioSource('pgm')
+    setNewVideoSource('pgm')
+    setRecorderProdId('')
     setAddUrlError(null)
   }
 
@@ -100,8 +120,9 @@ export function OutputsPanel() {
       body.outputDir = newOutputDir
       body.container = newContainer
       body.audioSource = newAudioSource
+      body.videoSource = newVideoSource
     }
-    await addOutput(body as { name: string; outputType: OutputType; url?: string; outputDir?: string; container?: string; audioSource?: string })
+    await addOutput(body as { name: string; outputType: OutputType; url?: string; outputDir?: string; container?: string; audioSource?: string; videoSource?: string })
     resetAdd()
     setAddOpen(false)
   }
@@ -292,6 +313,26 @@ export function OutputsPanel() {
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Output Directory</label>
               <input type="text" value={newOutputDir} onChange={(e) => setNewOutputDir(e.target.value)}
                 placeholder="recordings" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Video Source</label>
+              <select value={recorderProdId} onChange={(e) => { setRecorderProdId(e.target.value); setNewVideoSource('pgm') }}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                <option value="">— select production —</option>
+                {productions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Record Source</label>
+              <select value={newVideoSource} onChange={(e) => setNewVideoSource(e.target.value)}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                <option value="pgm">PGM (Program Feed)</option>
+                {recorderSources.map((s) => (
+                  <option key={s.sourceId} value={s.sourceId}>{s.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Audio Source</label>

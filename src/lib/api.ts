@@ -81,6 +81,7 @@ export interface ApiOutput {
   outputDir?: string
   container?: string
   audioSource?: string
+  videoSource?: string
   createdAt: string
   updatedAt: string
 }
