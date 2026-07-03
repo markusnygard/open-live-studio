@@ -1014,6 +1014,24 @@ export function ControllerPage() {
     {panels.recorder && hasRecorders && (
       <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 50 }}
         className="bg-[#141a21] border border-orange-500 rounded-lg p-3 flex gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px]">
+          {/* Master REC ALL / STOP ALL button */}
+          <button
+            type="button"
+            onClick={() => updateProductionStatus(activeProduction!.id, activeProduction?.status === 'active' ? 'inactive' : 'active')}
+            className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border min-w-[60px] font-semibold text-[10px] transition-colors ${activeProduction?.status === 'active' ? 'bg-red-600 text-white border-red-600 hover:bg-red-700' : 'bg-red-600 text-white border-red-600 hover:bg-red-700'}`}
+            title={activeProduction?.status === 'active' ? 'Stop all recorders' : 'Start all recorders'}
+          >
+            <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
+              {activeProduction?.status === 'active' ? (
+                <rect x="3" y="3" width="10" height="10" rx="1" />
+              ) : (
+                <circle cx="8" cy="8" r="6" />
+              )}
+            </svg>
+            <span className="leading-none">{activeProduction?.status === 'active' ? 'STOP' : 'REC'}</span>
+            <span className="text-[8px] leading-none text-white/70">ALL</span>
+          </button>
+          <div className="w-px bg-zinc-800" />
         {recorders.map((rec) => {
           const isRecording = activeProduction?.status === 'active'
           return (
