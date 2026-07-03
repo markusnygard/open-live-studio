@@ -1013,12 +1013,12 @@ export function ControllerPage() {
     {/* ── Recorder bar (floating, lower-right) ──────────────────────────────── */}
     {panels.recorder && hasRecorders && (
       <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 50 }}
-        className="bg-[#141a21] border border-orange-500 rounded-lg p-3 flex gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px]">
+        className="bg-[#141a21] border border-orange-500 rounded-lg p-3 flex gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] max-w-[calc(100vw-32px)]">
           {/* Master REC ALL / STOP ALL button */}
           <button
             type="button"
             onClick={() => updateProductionStatus(activeProduction!.id, activeProduction?.status === 'active' ? 'inactive' : 'active')}
-            className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border min-w-[60px] font-semibold text-[10px] transition-colors ${activeProduction?.status === 'active' ? 'bg-red-600 text-white border-red-600 hover:bg-red-700' : 'bg-red-600 text-white border-red-600 hover:bg-red-700'}`}
+            className={`flex flex-col items-center justify-center gap-1 px-3 py-2 rounded border min-w-[56px] font-semibold text-[10px] transition-colors ${activeProduction?.status === 'active' ? 'bg-red-600 text-white border-red-600 hover:bg-red-700' : 'bg-red-600 text-white border-red-600 hover:bg-red-700'}`}
             title={activeProduction?.status === 'active' ? 'Stop all recorders' : 'Start all recorders'}
           >
             <svg viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
@@ -1035,33 +1035,19 @@ export function ControllerPage() {
         {recorders.map((rec) => {
           const isRecording = activeProduction?.status === 'active'
           return (
-            <div key={rec!.id} className="flex flex-col gap-1 min-w-[160px]">
+            <div key={rec!.id} className="flex flex-col gap-1 min-w-[120px] max-w-[160px]">
               <div className="flex items-center gap-1.5">
                 <span className={`w-2 h-2 rounded-full shrink-0 ${isRecording ? 'bg-red-500' : 'bg-zinc-500'}`} />
-                <span className="font-semibold text-white text-xs">{rec!.name}</span>
-                <span className="text-[10px] text-zinc-500">{(rec as any).container || 'MP4'}</span>
+                <span className="font-semibold text-white text-xs truncate">{rec!.name}</span>
               </div>
-              <div className="text-[10px] text-zinc-500">{(rec as any).outputDir || 'rec'} · 17.5 GB free</div>
+              <div className="text-[10px] text-zinc-500">{(rec as any).outputDir || 'rec'} · {(rec as any).container || 'MP4'}</div>
               {isRecording ? (
-                <>
-                  <span className="font-mono text-[13px] text-zinc-300">—</span>
-                  <span className="text-[9px] text-zinc-500 truncate max-w-[160px]">{(rec as any).outputDir || 'rec'}/{rec!.name}_...</span>
-                  <div className="flex gap-1 mt-1">
-                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white border border-red-600 hover:bg-red-700"
-                      onClick={() => updateProductionStatus(activeProduction!.id, 'inactive')}>STOP</button>
-                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
-                      onClick={() => send({ type: 'RECORDER_SPLIT', outputId: rec!.id })}>SPLIT</button>
-                  </div>
-                </>
+                <div className="flex gap-1 mt-1">
+                  <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
+                    onClick={() => send({ type: 'RECORDER_SPLIT', outputId: rec!.id })}>SPLIT</button>
+                </div>
               ) : (
-                <>
-                  <span className="font-mono text-[13px] text-zinc-600">—</span>
-                  <span className="text-[9px] text-zinc-600">not recording</span>
-                  <div className="flex gap-1 mt-1">
-                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
-                      onClick={() => updateProductionStatus(activeProduction!.id, 'active')}>REC</button>
-                  </div>
-                </>
+                <div className="text-[9px] text-zinc-600 mt-1">stopped</div>
               )}
             </div>
           )
