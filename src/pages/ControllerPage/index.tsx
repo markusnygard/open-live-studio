@@ -724,6 +724,12 @@ export function ControllerPage() {
     .filter((o) => o?.outputType === 'recorder')
   const hasRecorders = recorders.length > 0
 
+  // Track which recorders are individually active (default: stopped)
+  const [recorderActive, setRecorderActive] = useState<Record<string, boolean>>({})
+  useEffect(() => {
+    if (activeProduction?.status !== 'active') setRecorderActive({})
+  }, [activeProduction?.status])
+
   const PANEL_ICONS = [
     { key: 'multiviewer', Icon: MultiviewerIcon },
     { key: 'pgm',         Icon: MonitorIcon     },
@@ -1016,7 +1022,8 @@ export function ControllerPage() {
       <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 50 }}
         className="bg-[#141a21] border border-orange-500 rounded-lg p-3 flex gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] max-w-[calc(100vw-32px)]">
         {recorders.map((rec) => {
-          const isActive = activeProduction?.status === 'active'
+          const isActive = recorderActive[rec!.id] ?? false
+          const flowRunning = activeProduction?.status === 'active'
           return (
             <div key={rec!.id} className="flex flex-col gap-1 min-w-[100px] max-w-[140px]">
               <div className="flex items-center gap-1.5">
@@ -1024,8 +1031,15 @@ export function ControllerPage() {
                 <span className="font-semibold text-white text-xs truncate">{rec!.name}</span>
               </div>
               <div className="text-[10px] text-zinc-500">{(rec as any).outputDir || 'rec'} · {(rec as any).container || 'MP4'}</div>
-              {isActive && (
+              {flowRunning && (
                 <div className="flex gap-1 mt-1">
+                  {isActive ? (
+                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white border border-red-600 hover:bg-red-700"
+                      onClick={() => { send({ type: 'RECORDER_TOGGLE', outputId: rec!.id, active: false }); setRecorderActive((prev) => ({ ...prev, [rec!.id]: false })) }}>STOP</button>
+                  ) : (
+                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
+                      onClick={() => { send({ type: 'RECORDER_TOGGLE', outputId: rec!.id, active: true }); setRecorderActive((prev) => ({ ...prev, [rec!.id]: true })) }}>REC</button>
+                  )}
                   <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
                     onClick={() => send({ type: 'RECORDER_SPLIT', outputId: rec!.id })}>SPLIT</button>
                 </div>
