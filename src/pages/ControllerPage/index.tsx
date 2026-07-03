@@ -779,9 +779,9 @@ export function ControllerPage() {
           </div>
         )}
 
-        {/* File browser popup — anchors below the card */}
+        {/* File browser popup — opens above the card */}
         {showBrowser && (
-          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100 }}
+          <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, zIndex: 100 }}
             className="bg-[#141a21] border border-zinc-600 rounded-lg p-3 shadow-[0_4px_24px_rgba(0,0,0,0.7)] text-[11px] w-[280px]">
             <div className="flex gap-1 mb-2">
               {browserParent !== null && (
