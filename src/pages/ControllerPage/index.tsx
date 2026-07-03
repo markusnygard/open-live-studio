@@ -750,8 +750,8 @@ export function ControllerPage() {
     }
 
     return (
-      <div style={{ position: 'fixed', bottom: 16, right: 16 + (index * 320), zIndex: 49 }}
-        className="bg-[#141a21] border border-green-500 rounded-lg p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] w-[300px]">
+      <div style={{ position: 'fixed', bottom: 16, right: 16 + (index * 200), zIndex: 49 }}
+        className="bg-[#141a21] border border-green-500 rounded-lg p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] w-[180px]">
         <div className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-zinc-500 shrink-0" />
           <span className="font-semibold text-white text-xs truncate">{mp.name}</span>
@@ -768,29 +768,45 @@ export function ControllerPage() {
           <button type="button" onClick={() => { if (!showBrowser) loadBrowser('data/media'); setShowBrowser(!showBrowser) }}
             className={`px-2 py-1 rounded text-[10px] font-semibold border bg-transparent ${showBrowser ? 'text-orange-400 border-orange-400' : 'text-zinc-400 border-zinc-600'}`}>📁</button>
         </div>
+        {playerPlaylist.length > 0 && (
+          <div className="text-[10px] text-zinc-500 border-t border-zinc-800 pt-1">
+            {playerPlaylist.map((f, i) => (
+              <div key={f} className="flex items-center gap-1 text-zinc-400">
+                <span className="text-zinc-600 w-4">{i+1}.</span>
+                <span className="truncate">{f}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* File browser popup — anchors below the card */}
         {showBrowser && (
-          <div className="border border-zinc-700 rounded p-2 max-h-48 overflow-y-auto">
-            <div className="flex gap-1 mb-1">
+          <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, zIndex: 100 }}
+            className="bg-[#141a21] border border-zinc-600 rounded-lg p-3 shadow-[0_4px_24px_rgba(0,0,0,0.7)] text-[11px] w-[280px]">
+            <div className="flex gap-1 mb-2">
               {browserParent !== null && (
                 <button type="button" className="text-[10px] text-zinc-400 hover:text-white" onClick={() => loadBrowser(browserParent || 'data/media')}>⬆ ..</button>
               )}
               <span className="text-[10px] text-zinc-500 truncate flex-1">/{browserPath}</span>
+              <button type="button" className="text-[10px] text-zinc-400 hover:text-red-400" onClick={() => setShowBrowser(false)}>✕</button>
             </div>
-            {browserDirs.map((d) => (
-              <button key={d} type="button" className="block w-full text-left text-[10px] text-zinc-300 hover:text-orange-400 px-1"
-                onClick={() => loadBrowser(browserPath ? `${browserPath}/${d}` : d)}>📁 {d}</button>
-            ))}
-            {browserFiles.map((f) => {
-              const sel = selectedFiles.has(f)
-              return (
-                <button key={f} type="button" className={`block w-full text-left text-[10px] px-1 ${sel ? 'text-green-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-                  onClick={() => {
-                    const next = new Set(selectedFiles)
-                    if (sel) next.delete(f); else next.add(f)
-                    setSelectedFiles(next)
-                  }}>🎬 {f}</button>
-              )
-            })}
+            <div className="max-h-40 overflow-y-auto">
+              {browserDirs.map((d) => (
+                <button key={d} type="button" className="block w-full text-left text-[10px] text-zinc-300 hover:text-orange-400 px-1"
+                  onClick={() => loadBrowser(browserPath ? `${browserPath}/${d}` : d)}>📁 {d}</button>
+              ))}
+              {browserFiles.map((f) => {
+                const sel = selectedFiles.has(f)
+                return (
+                  <button key={f} type="button" className={`block w-full text-left text-[10px] px-1 ${sel ? 'text-green-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    onClick={() => {
+                      const next = new Set(selectedFiles)
+                      if (sel) next.delete(f); else next.add(f)
+                      setSelectedFiles(next)
+                    }}>🎬 {f}</button>
+                )
+              })}
+            </div>
             {selectedFiles.size > 0 && (
               <button type="button" className="mt-2 w-full px-2 py-1 rounded text-[10px] font-semibold bg-green-600 text-white border border-green-600 hover:bg-green-700"
                 onClick={() => {
@@ -801,16 +817,6 @@ export function ControllerPage() {
                   sourcesApi.update(mp.id, { playlist: newList } as any).catch(() => {})
                 }}>Add {selectedFiles.size} clips to playlist</button>
             )}
-          </div>
-        )}
-        {playerPlaylist.length > 0 && (
-          <div className="text-[10px] text-zinc-500 max-h-24 overflow-y-auto border-t border-zinc-800 pt-1">
-            {playerPlaylist.map((f, i) => (
-              <div key={f} className="flex items-center gap-1 text-zinc-400">
-                <span className="text-zinc-600 w-4">{i+1}.</span>
-                <span className="truncate">{f}</span>
-              </div>
-            ))}
           </div>
         )}
       </div>
