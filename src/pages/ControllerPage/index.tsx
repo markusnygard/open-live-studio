@@ -31,7 +31,7 @@ import { ToastContainer } from '@/components/ui/ToastContainer'
 
 const PANELS_STORAGE_KEY = 'ol-studio-panels'
 
-type Panels = { multiviewer: boolean; controller: boolean; audio: boolean; pgm: boolean; pip: boolean; fx: boolean }
+type Panels = { multiviewer: boolean; controller: boolean; audio: boolean; pgm: boolean; pip: boolean; fx: boolean; mediaplayer: boolean }
 
 function loadPanels(): Panels {
   try {
@@ -47,11 +47,12 @@ function loadPanels(): Panels {
           pgm:         p.pgm         !== false,
           pip:         p.pip         === true,
           fx:          p.fx          === true,
+          mediaplayer: p.mediaplayer === false,
         }
       }
     }
   } catch {}
-  return { multiviewer: true, controller: true, audio: true, pgm: true, pip: false, fx: false }
+  return { multiviewer: true, controller: true, audio: true, pgm: true, pip: false, fx: false, mediaplayer: false }
 }
 
 function savePanels(panels: Panels) {
@@ -705,7 +706,20 @@ export function ControllerPage() {
     </svg>
   )
 
+  const MediaPlayerIcon = () => (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+      <circle cx="24" cy="24" r="21.5"/>
+      <polygon points="32.7,24 19.7,16.49 19.7,31.51"/>
+    </svg>
+  )
+
   const numPips = activeProduction?.values?.num_pips !== undefined ? parseInt(String(activeProduction.values.num_pips), 10) : 0
+
+  // Check if any media player sources are assigned to the active production
+  const mediaPlayers = (activeProduction?.sources ?? [])
+    .map((s) => sources.find((src) => src.id === s.sourceId))
+    .filter((s) => s?.streamType === 'mediaplayer')
+  const hasMediaPlayers = mediaPlayers.length > 0
 
   const PANEL_ICONS = [
     { key: 'multiviewer', Icon: MultiviewerIcon },
@@ -714,6 +728,7 @@ export function ControllerPage() {
     ...(numPips > 0 ? [{ key: 'pip', Icon: PipIcon } as const] : []),
     { key: 'audio',       Icon: AudioIcon        },
     { key: 'fx',          Icon: LooksIcon        },
+    ...(hasMediaPlayers ? [{ key: 'mediaplayer', Icon: MediaPlayerIcon } as const] : []),
   ] as const
 
   const showBottomRow = panels.controller || panels.audio || (panels.pip && numPips > 0) || panels.fx
@@ -1064,6 +1079,27 @@ export function ControllerPage() {
       />
     </Modal>
     <ToastContainer />
+
+    {/* ── Media Player bar (floating, lower-right) ─────────────────────────── */}
+    {panels.mediaplayer && hasMediaPlayers && activeProduction?.status === 'active' && mediaPlayers.map((mp, i) => (
+      <div key={mp!.id} style={{ position: 'fixed', bottom: 16, right: 16 + (i * 180), zIndex: 49 }}
+        className="bg-[#141a21] border border-green-500 rounded-lg p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] w-[170px]">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-zinc-500 shrink-0" />
+          <span className="font-semibold text-white text-xs truncate">{mp!.name}</span>
+        </div>
+        <div className="flex gap-1 justify-center">
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp!.id, action: 'play' })}>▶</button>
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp!.id, action: 'pause' })}>⏸</button>
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp!.id, action: 'stop' })}>⏹</button>
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp!.id, action: 'next' })}>⏭</button>
+        </div>
+      </div>
+    ))}
     </>
   )
 }
