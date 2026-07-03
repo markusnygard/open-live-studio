@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useRef, type ReactNode } from 'react'
+import { useEffect, useCallback, useState, useRef, useMemo, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { useSearchParams, useNavigate } from 'react-router'
 import { useWebRTC } from '@/hooks/useWebRTC'
@@ -713,9 +713,12 @@ export function ControllerPage() {
   )
 
   const numPips = activeProduction?.values?.num_pips !== undefined ? parseInt(String(activeProduction.values.num_pips), 10) : 0
-  const mediaPlayers = (activeProduction?.sources ?? [])
-    .map((s) => sources.find((src) => src.id === s.sourceId))
-    .filter((s) => s?.streamType === 'mediaplayer')
+  const mediaPlayers = useMemo(() =>
+    (activeProduction?.sources ?? [])
+      .map((s) => sources.find((src) => src.id === s.sourceId))
+      .filter((s) => s?.streamType === 'mediaplayer'),
+    [activeProduction?.sources, sources]
+  )
   const hasMediaPlayers = mediaPlayers.length > 0
 
   const PANEL_ICONS = [
