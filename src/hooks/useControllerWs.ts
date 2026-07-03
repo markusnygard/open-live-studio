@@ -39,6 +39,7 @@ export type OutboundMessage =
   | { type: 'SELECT_PVW_PIP'; pip: number }
   | { type: 'SET_PIP'; pip: number; bg: number | null; zones: PipZone[]; transforms?: PipTransforms }
   | { type: 'SET_EFFECT'; target: EffectTarget; effect: VideoEffect }
+  | { type: 'RECORDER_SPLIT'; outputId: string }
 
 /**
  * Opens a WebSocket connection to /ws/productions/:id/controller.

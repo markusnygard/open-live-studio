@@ -464,6 +464,7 @@ export function ControllerPage() {
   const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pgmInput, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction, afvRampUpMs, afvRampDownMs, dskState, deactivatedExternally, setDeactivatedExternally } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const fetchProductions = useProductionsStore((s) => s.fetchAll)
+  const updateProductionStatus = useProductionsStore((s) => s.updateStatus)
   const refreshOneProduction = useProductionsStore((s) => s.refreshOne)
   const fetchSources = useSourcesStore((s) => s.fetchAll)
   const sources = useSourcesStore((s) => s.sources)
@@ -1010,11 +1011,11 @@ export function ControllerPage() {
     </div>
 
     {/* ── Recorder bar (floating, lower-right) ──────────────────────────────── */}
-    {panels.recorder && hasRecorders && activeProduction?.status === 'active' && (
+    {panels.recorder && hasRecorders && (
       <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 50 }}
         className="bg-[#141a21] border border-orange-500 rounded-lg p-3 flex gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px]">
         {recorders.map((rec) => {
-          const isRecording = false // TODO: poll recorder state from Strom
+          const isRecording = activeProduction?.status === 'active'
           return (
             <div key={rec!.id} className="flex flex-col gap-1 min-w-[160px]">
               <div className="flex items-center gap-1.5">
@@ -1025,11 +1026,13 @@ export function ControllerPage() {
               <div className="text-[10px] text-zinc-500">{(rec as any).outputDir || 'rec'} · 17.5 GB free</div>
               {isRecording ? (
                 <>
-                  <span className="font-mono text-[13px] text-zinc-300">00:00:00</span>
-                  <span className="text-[9px] text-zinc-500">file.mp4</span>
+                  <span className="font-mono text-[13px] text-zinc-300">—</span>
+                  <span className="text-[9px] text-zinc-500 truncate max-w-[160px]">{(rec as any).outputDir || 'rec'}/{rec!.name}_...</span>
                   <div className="flex gap-1 mt-1">
-                    <button className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white border border-red-600">STOP</button>
-                    <button className="px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent">SPLIT</button>
+                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white border border-red-600 hover:bg-red-700"
+                      onClick={() => updateProductionStatus(activeProduction!.id, 'inactive')}>STOP</button>
+                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
+                      onClick={() => send({ type: 'RECORDER_SPLIT', outputId: rec!.id })}>SPLIT</button>
                   </div>
                 </>
               ) : (
@@ -1037,7 +1040,8 @@ export function ControllerPage() {
                   <span className="font-mono text-[13px] text-zinc-600">—</span>
                   <span className="text-[9px] text-zinc-600">not recording</span>
                   <div className="flex gap-1 mt-1">
-                    <button className="px-2 py-0.5 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent">REC</button>
+                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
+                      onClick={() => updateProductionStatus(activeProduction!.id, 'active')}>REC</button>
                   </div>
                 </>
               )}
