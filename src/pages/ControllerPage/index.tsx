@@ -754,7 +754,8 @@ export function ControllerPage() {
             {/* Panel toggle icons */}
             {PANEL_ICONS.map(({ key, Icon }) => {
               const isRecorder = key === 'recorder'
-              const isRecording = isRecorder && activeProduction?.status === 'active'
+              const hasActiveRecorders = Object.values(recorderActive).some(Boolean)
+              const isRecording = isRecorder && hasActiveRecorders
               const iconColor = isRecorder
                 ? (isRecording ? 'text-red-500' : panels.recorder ? 'text-orange-500' : 'text-zinc-600')
                 : panels[key] ? 'text-orange-500' : 'text-zinc-600'
