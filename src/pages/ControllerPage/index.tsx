@@ -24,7 +24,7 @@ import { useGraphicsStore } from '@/store/graphics.store'
 import { useOutputsStore } from '@/store/outputs.store'
 import { useAudioStore } from '@/store/audio.store'
 import { useViewerStore } from '@/store/viewer.store'
-import { audioApi, type ApiProduction, sourcesApi, request } from '@/lib/api'
+import { audioApi, type ApiProduction, sourcesApi, request, type ApiSource } from '@/lib/api'
 import { ToastContainer } from '@/components/ui/ToastContainer'
 
 // ─── Panel layout persistence ─────────────────────────────────────────────────
@@ -697,6 +697,12 @@ export function ControllerPage() {
     </svg>
   )
 
+  const MediaPlayerIcon = () => (
+    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
+      <circle cx="24" cy="24" r="21.5"/>
+      <polygon points="32.7,24 19.7,16.49 19.7,31.51"/>
+    </svg>
+  )
 
   const LooksIcon = () => (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
@@ -706,16 +712,7 @@ export function ControllerPage() {
     </svg>
   )
 
-  const MediaPlayerIcon = () => (
-    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="20" height="20">
-      <circle cx="24" cy="24" r="21.5"/>
-      <polygon points="32.7,24 19.7,16.49 19.7,31.51"/>
-    </svg>
-  )
-
   const numPips = activeProduction?.values?.num_pips !== undefined ? parseInt(String(activeProduction.values.num_pips), 10) : 0
-
-  // Check if any media player sources are assigned to the active production
   const mediaPlayers = (activeProduction?.sources ?? [])
     .map((s) => sources.find((src) => src.id === s.sourceId))
     .filter((s) => s?.streamType === 'mediaplayer')
@@ -732,6 +729,93 @@ export function ControllerPage() {
   ] as const
 
   const showBottomRow = panels.controller || panels.audio || (panels.pip && numPips > 0) || panels.fx
+
+  function MediaPlayerCard({ mp, index }: { mp: ApiSource; index: number }) {
+    const [playerPlaylist, setPlayerPlaylist] = useState<string[]>([])
+    const [showBrowser, setShowBrowser] = useState(false)
+    const [browserPath, setBrowserPath] = useState('data/media')
+    const [browserParent, setBrowserParent] = useState<string | null>(null)
+    const [browserDirs, setBrowserDirs] = useState<string[]>([])
+    const [browserFiles, setBrowserFiles] = useState<string[]>([])  
+    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
+
+    const loadBrowser = (p: string) => {
+      request<{ dirs: string[]; files: string[]; path: string; parent: string | null }>(`/api/v1/recorder/dirs?path=${encodeURIComponent(p)}&files=1`)
+        .then(d => {
+          setBrowserPath(d.path || p)
+          setBrowserParent(d.parent)
+          setBrowserDirs(d.dirs || [])
+          setBrowserFiles(d.files || [])
+        }).catch(() => {})
+    }
+
+    return (
+      <div style={{ position: 'fixed', bottom: 16, right: 16 + (index * 320), zIndex: 49 }}
+        className="bg-[#141a21] border border-green-500 rounded-lg p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] w-[300px]">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-zinc-500 shrink-0" />
+          <span className="font-semibold text-white text-xs truncate">{mp.name}</span>
+        </div>
+        <div className="flex gap-1 justify-center">
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })}>▶</button>
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'pause' })}>⏸</button>
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'stop' })}>⏹</button>
+          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
+            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'next' })}>⏭</button>
+          <button type="button" onClick={() => { if (!showBrowser) loadBrowser('data/media'); setShowBrowser(!showBrowser) }}
+            className={`px-2 py-1 rounded text-[10px] font-semibold border bg-transparent ${showBrowser ? 'text-orange-400 border-orange-400' : 'text-zinc-400 border-zinc-600'}`}>📁</button>
+        </div>
+        {showBrowser && (
+          <div className="border border-zinc-700 rounded p-2 max-h-48 overflow-y-auto">
+            <div className="flex gap-1 mb-1">
+              {browserParent !== null && (
+                <button type="button" className="text-[10px] text-zinc-400 hover:text-white" onClick={() => loadBrowser(browserParent || 'data/media')}>⬆ ..</button>
+              )}
+              <span className="text-[10px] text-zinc-500 truncate flex-1">/{browserPath}</span>
+            </div>
+            {browserDirs.map((d) => (
+              <button key={d} type="button" className="block w-full text-left text-[10px] text-zinc-300 hover:text-orange-400 px-1"
+                onClick={() => loadBrowser(browserPath ? `${browserPath}/${d}` : d)}>📁 {d}</button>
+            ))}
+            {browserFiles.map((f) => {
+              const sel = selectedFiles.has(f)
+              return (
+                <button key={f} type="button" className={`block w-full text-left text-[10px] px-1 ${sel ? 'text-green-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => {
+                    const next = new Set(selectedFiles)
+                    if (sel) next.delete(f); else next.add(f)
+                    setSelectedFiles(next)
+                  }}>🎬 {f}</button>
+              )
+            })}
+            {selectedFiles.size > 0 && (
+              <button type="button" className="mt-2 w-full px-2 py-1 rounded text-[10px] font-semibold bg-green-600 text-white border border-green-600 hover:bg-green-700"
+                onClick={() => {
+                  const newList = Array.from(selectedFiles)
+                  setPlayerPlaylist(newList)
+                  setSelectedFiles(new Set())
+                  setShowBrowser(false)
+                  sourcesApi.update(mp.id, { playlist: newList } as any).catch(() => {})
+                }}>Add {selectedFiles.size} clips to playlist</button>
+            )}
+          </div>
+        )}
+        {playerPlaylist.length > 0 && (
+          <div className="text-[10px] text-zinc-500 max-h-24 overflow-y-auto border-t border-zinc-800 pt-1">
+            {playerPlaylist.map((f, i) => (
+              <div key={f} className="flex items-center gap-1 text-zinc-400">
+                <span className="text-zinc-600 w-4">{i+1}.</span>
+                <span className="truncate">{f}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -1080,93 +1164,9 @@ export function ControllerPage() {
     </Modal>
     <ToastContainer />
 
-    {/* ── Media Player bar (floating, lower-right) ─────────────────────────── */}
-function MediaPlayerCard({ mp, index, send }: { mp: ApiSource; index: number; send: (msg: OutboundMessage) => void }) {
-  const [playerPlaylist, setPlayerPlaylist] = useState<string[]>([])
-  const [showBrowser, setShowBrowser] = useState(false)
-  const [browserPath, setBrowserPath] = useState('data/media')
-  const [browserParent, setBrowserParent] = useState<string | null>(null)
-  const [browserDirs, setBrowserDirs] = useState<string[]>([])
-  const [browserFiles, setBrowserFiles] = useState<string[]>([])  
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
-
-  const loadBrowser = (p: string) => {
-    request<{ dirs: string[]; files: string[]; path: string; parent: string | null }>(`/api/v1/recorder/dirs?path=${encodeURIComponent(p)}&files=1`)
-      .then(d => {
-        setBrowserPath(d.path || p)
-        setBrowserParent(d.parent)
-        setBrowserDirs(d.dirs || [])
-        setBrowserFiles(d.files || [])
-      }).catch(() => {})
-  }
-
-  return (
-    <div style={{ position: 'fixed', bottom: 16, right: 16 + (index * 320), zIndex: 49 }}
-      className="bg-[#141a21] border border-green-500 rounded-lg p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] w-[300px]">
-      <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-zinc-500 shrink-0" />
-        <span className="font-semibold text-white text-xs truncate">{mp.name}</span>
-      </div>
-      <div className="flex gap-1 justify-center">
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950"
-          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })}>▶</button>
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950"
-          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'pause' })}>⏸</button>
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
-          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'stop' })}>⏹</button>
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
-          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'next' })}>⏭</button>
-        <button type="button" onClick={() => { if (!showBrowser) loadBrowser('data/media'); setShowBrowser(!showBrowser) }}
-          className={`px-2 py-1 rounded text-[10px] font-semibold border bg-transparent ${showBrowser ? 'text-orange-400 border-orange-400' : 'text-zinc-400 border-zinc-600'}`}>📁</button>
-      </div>
-      {showBrowser && (
-        <div className="border border-zinc-700 rounded p-2 max-h-48 overflow-y-auto">
-          <div className="flex gap-1 mb-1">
-            {browserParent !== null && (
-              <button type="button" className="text-[10px] text-zinc-400 hover:text-white" onClick={() => loadBrowser(browserParent || 'data/media')}>⬆ ..</button>
-            )}
-            <span className="text-[10px] text-zinc-500 truncate flex-1">/{browserPath}</span>
-          </div>
-          {browserDirs.map((d) => (
-            <button key={d} type="button" className="block w-full text-left text-[10px] text-zinc-300 hover:text-orange-400 px-1"
-              onClick={() => loadBrowser(browserPath ? `${browserPath}/${d}` : d)}>📁 {d}</button>
-          ))}
-          {browserFiles.map((f) => {
-            const sel = selectedFiles.has(f)
-            return (
-              <button key={f} type="button" className={`block w-full text-left text-[10px] px-1 ${sel ? 'text-green-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-                onClick={() => {
-                  const next = new Set(selectedFiles)
-                  if (sel) next.delete(f); else next.add(f)
-                  setSelectedFiles(next)
-                }}>🎬 {f}</button>
-            )
-          })}
-          {selectedFiles.size > 0 && (
-            <button type="button" className="mt-2 w-full px-2 py-1 rounded text-[10px] font-semibold bg-green-600 text-white border border-green-600 hover:bg-green-700"
-              onClick={() => {
-                const newList = Array.from(selectedFiles)
-                setPlayerPlaylist(newList)
-                setSelectedFiles(new Set())
-                setShowBrowser(false)
-                sourcesApi.update(mp.id, { playlist: newList } as any).catch(() => {})
-              }}>Add {selectedFiles.size} clips to playlist</button>
-          )}
-        </div>
-      )}
-      {playerPlaylist.length > 0 && (
-        <div className="text-[10px] text-zinc-500 max-h-24 overflow-y-auto border-t border-zinc-800 pt-1">
-          {playerPlaylist.map((f, i) => (
-            <div key={f} className="flex items-center gap-1 text-zinc-400">
-              <span className="text-zinc-600 w-4">{i+1}.</span>
-              <span className="truncate">{f}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
+    {panels.mediaplayer && hasMediaPlayers && activeProduction?.status === 'active' && mediaPlayers.map((mp, i) => (
+      <MediaPlayerCard key={mp!.id} mp={mp!} index={i} />
+    ))}
     </>
   )
 }
