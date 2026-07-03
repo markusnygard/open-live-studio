@@ -731,7 +731,7 @@ export function ControllerPage() {
     ...(hasMediaPlayers ? [{ key: 'mediaplayer', Icon: MediaPlayerIcon } as const] : []),
   ] as const
 
-  const showBottomRow = panels.controller || panels.audio || (panels.pip && numPips > 0) || panels.fx
+  const showBottomRow = panels.controller || panels.audio || (panels.pip && numPips > 0) || panels.fx || panels.mediaplayer
 
   function MediaPlayerCard({ mp, index }: { mp: ApiSource; index: number }) {
     const [playerPlaylist, setPlayerPlaylist] = useState<string[]>([])
@@ -753,13 +753,12 @@ export function ControllerPage() {
     }
 
     return (
-      <div style={{ position: 'fixed', bottom: 16, right: 16 + (index * 200), zIndex: 49 }}
-        className="bg-[#141a21] border border-green-500 rounded-lg p-3 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] w-[180px]">
-        <div className="flex items-center gap-1.5">
+      <div className="bg-[#0b0f14] border border-zinc-800 rounded p-2 text-[11px]">
+        <div className="flex items-center gap-1.5 mb-2">
           <span className="w-2 h-2 rounded-full bg-zinc-500 shrink-0" />
-          <span className="font-semibold text-white text-xs truncate">{mp.name}</span>
+          <span className="font-semibold text-white text-xs">{mp.name}</span>
         </div>
-        <div className="flex gap-1 justify-center">
+        <div className="flex gap-1 mb-2">
           <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950"
             onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })}>▶</button>
           <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950"
@@ -771,45 +770,29 @@ export function ControllerPage() {
           <button type="button" onClick={() => { if (!showBrowser) loadBrowser('data/media'); setShowBrowser(!showBrowser) }}
             className={`px-2 py-1 rounded text-[10px] font-semibold border bg-transparent ${showBrowser ? 'text-orange-400 border-orange-400' : 'text-zinc-400 border-zinc-600'}`}>📁</button>
         </div>
-        {playerPlaylist.length > 0 && (
-          <div className="text-[10px] text-zinc-500 border-t border-zinc-800 pt-1">
-            {playerPlaylist.map((f, i) => (
-              <div key={f} className="flex items-center gap-1 text-zinc-400">
-                <span className="text-zinc-600 w-4">{i+1}.</span>
-                <span className="truncate">{f}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* File browser popup — opens above the card */}
         {showBrowser && (
-          <div style={{ position: 'absolute', bottom: '100%', right: 0, marginBottom: 4, zIndex: 100 }}
-            className="bg-[#141a21] border border-zinc-600 rounded-lg p-3 shadow-[0_4px_24px_rgba(0,0,0,0.7)] text-[11px] w-[280px]">
-            <div className="flex gap-1 mb-2">
+          <div className="border border-zinc-700 rounded mb-2 p-2 max-h-40 overflow-y-auto bg-[#141a21]">
+            <div className="flex gap-1 mb-1">
               {browserParent !== null && (
                 <button type="button" className="text-[10px] text-zinc-400 hover:text-white" onClick={() => loadBrowser(browserParent || 'data/media')}>⬆ ..</button>
               )}
               <span className="text-[10px] text-zinc-500 truncate flex-1">/{browserPath}</span>
-              <button type="button" className="text-[10px] text-zinc-400 hover:text-red-400" onClick={() => setShowBrowser(false)}>✕</button>
             </div>
-            <div className="max-h-40 overflow-y-auto">
-              {browserDirs.map((d) => (
-                <button key={d} type="button" className="block w-full text-left text-[10px] text-zinc-300 hover:text-orange-400 px-1"
-                  onClick={() => loadBrowser(browserPath ? `${browserPath}/${d}` : d)}>📁 {d}</button>
-              ))}
-              {browserFiles.map((f) => {
-                const sel = selectedFiles.has(f)
-                return (
-                  <button key={f} type="button" className={`block w-full text-left text-[10px] px-1 ${sel ? 'text-green-400' : 'text-zinc-500 hover:text-zinc-300'}`}
-                    onClick={() => {
-                      const next = new Set(selectedFiles)
-                      if (sel) next.delete(f); else next.add(f)
-                      setSelectedFiles(next)
-                    }}>🎬 {f}</button>
-                )
-              })}
-            </div>
+            {browserDirs.map((d) => (
+              <button key={d} type="button" className="block w-full text-left text-[10px] text-zinc-300 hover:text-orange-400 px-1"
+                onClick={() => loadBrowser(browserPath ? `${browserPath}/${d}` : d)}>📁 {d}</button>
+            ))}
+            {browserFiles.map((f) => {
+              const sel = selectedFiles.has(f)
+              return (
+                <button key={f} type="button" className={`block w-full text-left text-[10px] px-1 ${sel ? 'text-green-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  onClick={() => {
+                    const next = new Set(selectedFiles)
+                    if (sel) next.delete(f); else next.add(f)
+                    setSelectedFiles(next)
+                  }}>🎬 {f}</button>
+              )
+            })}
             {selectedFiles.size > 0 && (
               <button type="button" className="mt-2 w-full px-2 py-1 rounded text-[10px] font-semibold bg-green-600 text-white border border-green-600 hover:bg-green-700"
                 onClick={() => {
@@ -820,6 +803,16 @@ export function ControllerPage() {
                   sourcesApi.update(mp.id, { playlist: newList } as any).catch(() => {})
                 }}>Add {selectedFiles.size} clips to playlist</button>
             )}
+          </div>
+        )}
+        {playerPlaylist.length > 0 && (
+          <div className="text-[10px] text-zinc-500 max-h-24 overflow-y-auto pt-1">
+            {playerPlaylist.map((f, i) => (
+              <div key={f} className="flex items-center gap-1 text-zinc-400">
+                <span className="text-zinc-600 w-4">{i+1}.</span>
+                <span className="truncate">{f}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -1072,6 +1065,16 @@ export function ControllerPage() {
                 <PipPanel onApply={handleApplyPip} className="flex-1 overflow-y-auto min-h-0" />
               </div>
             )}
+            {panels.mediaplayer && hasMediaPlayers && activeProduction?.status === 'active' && (
+              <div className={`${panels.controller || panels.fx ? 'pr-3' : 'px-3'} flex flex-col gap-2 shrink-0 h-full overflow-hidden`} style={{ width: 360 }}>
+                <SectionLabel icon={<MediaPlayerIcon />} tooltip="Media player. Browse and select clips from the media folder to build a playlist. Use transport controls to play, pause, stop and skip clips. The video and audio output is routed to the vision mixer and audio mixer as a regular source." onHide={() => togglePanel('mediaplayer')}>Media Player</SectionLabel>
+                <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-3">
+                  {mediaPlayers.map((mp, i) => (
+                    <MediaPlayerCard key={mp!.id} mp={mp!} index={i} />
+                  ))}
+                </div>
+              </div>
+            )}
             {panels.audio && (
               <div className={`flex flex-col gap-2 flex-1 min-w-0 h-full ${panels.controller || panels.fx ? 'pr-3' : 'px-3'}`}>
                 <SectionLabel icon={<AudioIcon />} tooltip="Audio mixer. Drag faders or click the level to adjust channel volume. Toggle On/Off to mute a channel. Use AUX sends to route audio to commentary or recording feeds. Group channels together to control them as one. Adjust the monitor level with the master fader. Press the gear icon to set AFV ramp times." onPopOut={activeProductionId ? () => { window.open(`/pane/audio?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('audio')} actions={
@@ -1172,10 +1175,6 @@ export function ControllerPage() {
       />
     </Modal>
     <ToastContainer />
-
-    {panels.mediaplayer && hasMediaPlayers && activeProduction?.status === 'active' && mediaPlayers.map((mp, i) => (
-      <MediaPlayerCard key={mp!.id} mp={mp!} index={i} />
-    ))}
     </>
   )
 }
