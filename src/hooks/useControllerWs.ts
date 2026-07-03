@@ -41,6 +41,9 @@ export type OutboundMessage =
   | { type: 'SET_EFFECT'; target: EffectTarget; effect: VideoEffect }
   | { type: 'RECORDER_SPLIT'; outputId: string }
   | { type: 'RECORDER_TOGGLE'; outputId: string; active: boolean }
+  | { type: 'MEDIAPLAYER_CONTROL'; sourceId: string; action: 'play' | 'pause' | 'stop' | 'next' | 'previous' }
+  | { type: 'MEDIAPLAYER_SEEK'; sourceId: string; positionMs: number }
+  | { type: 'MEDIAPLAYER_GOTO'; sourceId: string; index: number }
 
 /**
  * Opens a WebSocket connection to /ws/productions/:id/controller.

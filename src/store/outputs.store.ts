@@ -14,7 +14,7 @@ interface OutputsState {
 interface OutputsActions {
   fetchAll: () => Promise<void>
   addOutput: (body: { name: string; outputType: OutputType; url?: string; outputDir?: string; container?: string; audioSource?: string }) => Promise<ApiOutput>
-  updateOutput: (id: string, body: { name?: string; url?: string }) => Promise<void>
+  updateOutput: (id: string, body: { name?: string; url?: string; outputDir?: string; container?: string; audioSource?: string; videoSource?: string }) => Promise<void>
   removeOutput: (id: string) => Promise<void>
 }
 

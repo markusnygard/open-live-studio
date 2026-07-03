@@ -49,7 +49,7 @@ export async function request<T>(path: string, init?: RequestOptions): Promise<T
   return res.json() as Promise<T>
 }
 
-export type StreamType = 'srt' | 'efp' | 'whip' | 'test1' | 'test2' | 'html' | 'ndi' | 'sdi'
+export type StreamType = 'srt' | 'efp' | 'whip' | 'test1' | 'test2' | 'html' | 'ndi' | 'sdi' | 'mediaplayer'
 
 export interface ApiSource {
   id: string

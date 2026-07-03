@@ -107,14 +107,14 @@ export function OutputsPanel() {
     return () => clearInterval(id)
   }, [fetchAll, fetchProductions])
 
-  const [creatableTypes, setCreatableTypes] = useState<OutputType[]>(['mpegtssrt', 'efpsrt', 'recorder'])
+  const [creatableTypes, setCreatableTypes] = useState<OutputType[]>(['mpegtssrt', 'efpsrt'])
   const [sdiDevices, setSdiDevices] = useState(4)
 
   useEffect(() => {
     capabilitiesApi.get().then((caps) => {
-      setCreatableTypes(['mpegtssrt', 'efpsrt', 'recorder', ...(caps.ndi ? ['ndi' as OutputType] : []), ...(caps.sdi ? ['sdi' as OutputType] : [])])
+      setCreatableTypes(['mpegtssrt', 'efpsrt', ...(caps.ndi ? ['ndi' as OutputType] : []), ...(caps.sdi ? ['sdi' as OutputType] : [])])
       setSdiDevices(caps.sdiDevices > 0 ? caps.sdiDevices : 4)
-    }).catch(() => setCreatableTypes(['mpegtssrt', 'efpsrt', 'recorder', 'ndi', 'sdi']))
+    }).catch(() => setCreatableTypes(['mpegtssrt', 'efpsrt', 'ndi', 'sdi']))
   }, [])
 
   const activeOutputIds = new Set(
@@ -124,7 +124,7 @@ export function OutputsPanel() {
   )
 
   const [addOpen, setAddOpen] = useState(false)
-  const [editTarget, setEditTarget] = useState<{ id: string; name: string; url: string; outputType: OutputType } | null>(null)
+  const [editTarget, setEditTarget] = useState<{ id: string; name: string; url: string; outputType: OutputType; outputDir?: string; container?: string; audioSource?: string; videoSource?: string } | null>(null)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [addUrlError, setAddUrlError] = useState<string | null>(null)
@@ -208,7 +208,17 @@ export function OutputsPanel() {
       const duplicate = outputs.find((o) => o.id !== editTarget.id && o.url?.trim() === editTarget.url.trim())
       if (duplicate) { setEditUrlError(`Address already used by "${duplicate.name}"`); return }
     }
-    await updateOutput(editTarget.id, { name: editTarget.name.trim(), url: isSrt ? editTarget.url.trim() || undefined : undefined })
+    const body: Record<string, string | undefined> = {
+      name: editTarget.name.trim(),
+      url: isSrt ? editTarget.url.trim() || undefined : undefined,
+    }
+    if (editTarget.outputType === 'recorder') {
+      body.outputDir = editTarget.outputDir
+      body.container = editTarget.container
+      body.audioSource = editTarget.audioSource
+      body.videoSource = editTarget.videoSource
+    }
+    await updateOutput(editTarget.id, body as { name?: string; url?: string })
     setEditUrlError(null)
     setEditTarget(null)
   }
@@ -482,6 +492,39 @@ export function OutputsPanel() {
               ) : (
               <p className="text-sm text-[--color-amber]">No DeckLink hardware detected.</p>
               )}
+            </div>
+            )}
+            {editTarget.outputType === 'recorder' && (
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Container</label>
+                <select value={editTarget.container || 'mp4'} onChange={(e) => setEditTarget({ ...editTarget, container: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                  <option value="mp4">MP4</option>
+                  <option value="mkv">MKV</option>
+                  <option value="mpegts">MPEG-TS</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Output Directory</label>
+                <input type="text" value={editTarget.outputDir || ''} onChange={(e) => setEditTarget({ ...editTarget, outputDir: e.target.value })}
+                  placeholder="recordings" className={inputCls} />
+              </div>
+              <div>
+                <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Record Source</label>
+                <select value={editTarget.videoSource || 'pgm'} onChange={(e) => setEditTarget({ ...editTarget, videoSource: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                  <option value="pgm">PGM</option>
+                  <option value="pgm_clean">Clean PGM</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Audio Source</label>
+                <select value={editTarget.audioSource || 'pgm'} onChange={(e) => setEditTarget({ ...editTarget, audioSource: e.target.value })}
+                  className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                  <option value="pgm">PGM</option>
+                </select>
+              </div>
             </div>
             )}
             <div className="flex justify-end gap-2 pt-1">

@@ -31,7 +31,7 @@ import { ToastContainer } from '@/components/ui/ToastContainer'
 
 const PANELS_STORAGE_KEY = 'ol-studio-panels'
 
-type Panels = { multiviewer: boolean; controller: boolean; audio: boolean; pgm: boolean; pip: boolean; fx: boolean; recorder: boolean }
+type Panels = { multiviewer: boolean; controller: boolean; audio: boolean; pgm: boolean; pip: boolean; fx: boolean }
 
 function loadPanels(): Panels {
   try {
@@ -47,12 +47,11 @@ function loadPanels(): Panels {
           pgm:         p.pgm         !== false,
           pip:         p.pip         === true,
           fx:          p.fx          === true,
-          recorder:    p.recorder    === false,
         }
       }
     }
   } catch {}
-  return { multiviewer: true, controller: true, audio: true, pgm: true, pip: false, fx: false, recorder: false }
+  return { multiviewer: true, controller: true, audio: true, pgm: true, pip: false, fx: false }
 }
 
 function savePanels(panels: Panels) {
@@ -464,7 +463,6 @@ export function ControllerPage() {
   const { cut, auto, ftb, setPvw, pvwInput, pvwPip, pgmPip, pgmInput, pips, setPvwPip, transitionType, transitionDurationMs, activeProductionId, setActiveProduction, afvRampUpMs, afvRampDownMs, dskState, deactivatedExternally, setDeactivatedExternally } = useProductionStore()
   const productions = useProductionsStore((s) => s.productions)
   const fetchProductions = useProductionsStore((s) => s.fetchAll)
-  const updateProductionStatus = useProductionsStore((s) => s.updateStatus)
   const refreshOneProduction = useProductionsStore((s) => s.refreshOne)
   const fetchSources = useSourcesStore((s) => s.fetchAll)
   const sources = useSourcesStore((s) => s.sources)
@@ -707,28 +705,7 @@ export function ControllerPage() {
     </svg>
   )
 
-  const RecorderIcon = () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" width="20" height="20">
-      <path d="M18.5 12C18.5 13.3807 17.3807 14.5 16 14.5C14.6193 14.5 13.5 13.3807 13.5 12C13.5 10.6193 14.6193 9.5 16 9.5C17.3807 9.5 18.5 10.6193 18.5 12Z" />
-      <path d="M10.5 12C10.5 13.3807 9.38071 14.5 8 14.5C6.61929 14.5 5.5 13.3807 5.5 12C5.5 10.6193 6.61929 9.5 8 9.5C9.38071 9.5 10.5 10.6193 10.5 12Z" />
-      <path d="M8 14.5H16" strokeLinecap="round" />
-      <path d="M22 12C22 16.714 22 19.0711 20.5355 20.5355C19.0711 22 16.714 22 12 22C7.28595 22 4.92893 22 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" strokeLinecap="round" />
-    </svg>
-  )
-
   const numPips = activeProduction?.values?.num_pips !== undefined ? parseInt(String(activeProduction.values.num_pips), 10) : 0
-
-  // Check if any recorder outputs are assigned to the active production
-  const recorders = (activeProduction?.outputAssignments ?? [])
-    .map((a) => outputs.find((o) => o.id === a.outputId))
-    .filter((o) => o?.outputType === 'recorder')
-  const hasRecorders = recorders.length > 0
-
-  // Track which recorders are individually active (default: stopped)
-  const [recorderActive, setRecorderActive] = useState<Record<string, boolean>>({})
-  useEffect(() => {
-    if (activeProduction?.status !== 'active') setRecorderActive({})
-  }, [activeProduction?.status])
 
   const PANEL_ICONS = [
     { key: 'multiviewer', Icon: MultiviewerIcon },
@@ -737,7 +714,6 @@ export function ControllerPage() {
     ...(numPips > 0 ? [{ key: 'pip', Icon: PipIcon } as const] : []),
     { key: 'audio',       Icon: AudioIcon        },
     { key: 'fx',          Icon: LooksIcon        },
-    ...(hasRecorders ? [{ key: 'recorder', Icon: RecorderIcon } as const] : []),
   ] as const
 
   const showBottomRow = panels.controller || panels.audio || (panels.pip && numPips > 0) || panels.fx
@@ -752,24 +728,16 @@ export function ControllerPage() {
               {activeProduction?.name ?? 'Studio'}
             </span>
             {/* Panel toggle icons */}
-            {PANEL_ICONS.map(({ key, Icon }) => {
-              const isRecorder = key === 'recorder'
-              const hasActiveRecorders = Object.values(recorderActive).some(Boolean)
-              const isRecording = isRecorder && hasActiveRecorders
-              const iconColor = isRecorder
-                ? (isRecording ? 'text-red-500' : panels.recorder ? 'text-orange-500' : 'text-zinc-600')
-                : panels[key] ? 'text-orange-500' : 'text-zinc-600'
-              return (
+            {PANEL_ICONS.map(({ key, Icon }) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => togglePanel(key)}
-                className={`cursor-pointer transition-colors ${iconColor}`}
+                className={`cursor-pointer transition-colors ${panels[key] ? 'text-orange-500' : 'text-zinc-600'}`}
               >
                 <Icon />
               </button>
-              )
-            })}
+            ))}
           </div>
         }
         actions={
@@ -1017,43 +985,6 @@ export function ControllerPage() {
         )}
       </div>
     </div>
-
-    {/* ── Recorder bar (floating, lower-right) ──────────────────────────────── */}
-    {panels.recorder && hasRecorders && (
-      <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 50 }}
-        className="bg-[#141a21] border border-orange-500 rounded-lg p-3 flex gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.5)] text-[11px] max-w-[calc(100vw-32px)]">
-        {recorders.map((rec) => {
-          const isActive = recorderActive[rec!.id] ?? false
-          const flowRunning = activeProduction?.status === 'active'
-          return (
-            <div key={rec!.id} className="flex flex-col gap-1 min-w-[100px] max-w-[140px]">
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-red-500' : 'bg-zinc-500'}`} />
-                <span className="font-semibold text-white text-xs truncate">{rec!.name}</span>
-              </div>
-              <div className="text-[10px] text-zinc-500">{(rec as any).outputDir || 'rec'} · {(rec as any).container || 'MP4'}</div>
-              {flowRunning && (
-                <div className="flex gap-1 mt-1">
-                  {isActive ? (
-                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-600 text-white border border-red-600 hover:bg-red-700"
-                      onClick={() => { send({ type: 'RECORDER_TOGGLE', outputId: rec!.id, active: false }); setRecorderActive((prev) => ({ ...prev, [rec!.id]: false })) }}>STOP</button>
-                  ) : (
-                    <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
-                      onClick={() => { send({ type: 'RECORDER_TOGGLE', outputId: rec!.id, active: true }); setRecorderActive((prev) => ({ ...prev, [rec!.id]: true })) }}>REC</button>
-                  )}
-                  <button type="button" className="px-2 py-0.5 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
-                    onClick={() => send({ type: 'RECORDER_SPLIT', outputId: rec!.id })}>SPLIT</button>
-                </div>
-              )}
-            </div>
-          )
-        }).reduce((acc: React.ReactNode[], el, i) => {
-          if (i > 0) acc.push(<div key={`div-${i}`} className="w-px bg-zinc-800" />)
-          acc.push(el)
-          return acc
-        }, [])}
-      </div>
-    )}
 
     {/* ── Audio options modal ──────────────────────────────────────────────── */}
     <Modal open={audioOptionsOpen} title="Audio Options" onClose={() => setAudioOptionsOpen(false)} className="max-w-xs">

@@ -23,6 +23,7 @@ const STREAM_TYPE_LABELS: Record<StreamType, string> = {
   html: 'HTML',
   ndi: 'NDI',
   sdi: 'SDI',
+  mediaplayer: 'Media Player',
 }
 
 const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
@@ -34,6 +35,7 @@ const STREAM_TYPE_HAS_ADDRESS: Record<StreamType, boolean> = {
   html: true,
   ndi: true,
   sdi: true,
+  mediaplayer: true,
 }
 
 const STREAM_TYPE_HAS_LATENCY: Record<StreamType, boolean> = {
@@ -45,15 +47,17 @@ const STREAM_TYPE_HAS_LATENCY: Record<StreamType, boolean> = {
   html: false,
   ndi: false,
   sdi: false,
+  mediaplayer: false,
 }
 
 const STREAM_TYPE_ADDRESS_PLACEHOLDER: Partial<Record<StreamType, string>> = {
   html: 'https://example.com/overlay',
   ndi: '192.168.1.10:5961',
   sdi: '0 (device number)',
+  mediaplayer: '~/media/clips',
 }
 
-const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html', 'ndi', 'sdi']
+const CREATABLE_STREAM_TYPES: StreamType[] = ['srt', 'efp', 'html', 'ndi', 'sdi', 'mediaplayer']
 
 export function SourcesPanel() {
   const { sources, isLoading, lastFetchedAt, removeSource, addSource, updateSource, fetchAll } = useSourcesStore()
@@ -65,17 +69,17 @@ export function SourcesPanel() {
     return () => clearInterval(id)
   }, [fetchAll])
 
-  const [creatableTypes, setCreatableTypes] = useState<StreamType[]>(['srt', 'efp', 'html'])
+  const [creatableTypes, setCreatableTypes] = useState<StreamType[]>(['srt', 'efp', 'html', 'mediaplayer'])
   const [sdiDevices, setSdiDevices] = useState(4)
 
   useEffect(() => {
     capabilitiesApi.get().then((caps) => {
-      const types: StreamType[] = ['srt', 'efp', 'html']
-      if (caps.ndi) types.push('ndi')
-      if (caps.sdi) types.push('sdi')
-      setCreatableTypes(types)
-      setSdiDevices(caps.sdiDevices > 0 ? caps.sdiDevices : 4)
-    }).catch(() => setCreatableTypes(['srt', 'efp', 'html', 'ndi', 'sdi']))
+    const types: StreamType[] = ['srt', 'efp', 'html', 'mediaplayer']
+    if (caps.ndi) types.push('ndi')
+    if (caps.sdi) types.push('sdi')
+    setCreatableTypes(types)
+    setSdiDevices(caps.sdiDevices > 0 ? caps.sdiDevices : 4)
+  }).catch(() => setCreatableTypes(['srt', 'efp', 'html', 'mediaplayer', 'ndi', 'sdi']))
   }, [])
   const [addOpen, setAddOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
@@ -112,8 +116,8 @@ export function SourcesPanel() {
       if (address.startsWith('data:text/html')) return null
       try { const u = new URL(address); if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error() }
       catch { return 'Must be a valid http:// or https:// URL, or a data:text/html URI' }
-    } else if (streamType === 'ndi' || streamType === 'sdi') {
-      return null  // Any source name or device number is valid
+    } else if (streamType === 'ndi' || streamType === 'sdi' || streamType === 'mediaplayer') {
+      return null  // Any source name, device number, or folder path is valid
     } else {
       if (!/^srt:\/\/[^?#]*:\d+/.test(address.trim())) return 'Must be a valid srt:// URI'
     }
