@@ -77,19 +77,22 @@ export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; sen
       {/* Transport row: ▶⏸⏹⏭ on left, ↺📁 on right */}
       <div className="flex items-center gap-1 mb-2">
         <div className="flex gap-1">
-          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950"
+          <button type="button"
+            className={`px-2 py-1 rounded text-[10px] font-semibold text-green-400 border bg-transparent hover:bg-green-950 ${playerState.state === 'playing' ? 'border-green-400' : 'border-zinc-700'}`}
             onClick={() => {
-              // Always sync playlist before playing
               if (playerPlaylist.length > 0) {
                 send({ type: 'MEDIAPLAYER_SET_PLAYLIST', sourceId: mp.id, files: playerPlaylist })
               }
               send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })
             }}>▶</button>
-          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950"
+          <button type="button"
+            className={`px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border bg-transparent hover:bg-amber-950 ${playerState.state === 'paused' ? 'border-amber-400' : 'border-zinc-700'}`}
             onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'pause' })}>⏸</button>
-          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
+          <button type="button"
+            className={`px-2 py-1 rounded text-[10px] font-semibold text-red-400 border bg-transparent hover:bg-red-950 ${playerState.state === 'stopped' ? 'border-red-400' : 'border-zinc-700'}`}
             onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'stop' })}>⏹</button>
-          <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
+          <button type="button"
+            className="px-2 py-1 rounded text-[10px] font-semibold text-blue-400 border border-zinc-700 bg-transparent hover:bg-blue-950"
             onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'next' })}>⏭</button>
         </div>
         <div className="flex gap-1 ml-auto">
