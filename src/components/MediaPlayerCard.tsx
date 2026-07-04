@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { request, sourcesApi, type ApiSource } from '@/lib/api'
+import type { OutboundMessage } from '@/hooks/useControllerWs'
 
-export function MediaPlayerCard({ mp }: { mp: ApiSource }) {
+export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: OutboundMessage) => void }) {
   const [playerPlaylist, setPlayerPlaylist] = useState<string[]>([])
   const [showBrowser, setShowBrowser] = useState(false)
   const [browserPath, setBrowserPath] = useState('data/media')
@@ -27,11 +28,15 @@ export function MediaPlayerCard({ mp }: { mp: ApiSource }) {
         <span className="font-semibold text-white text-xs">{mp.name}</span>
       </div>
       <div className="flex gap-1 mb-2">
-        {/* Transport buttons don't need send prop — they're placeholder for now */}
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950">▶</button>
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950">⏸</button>
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950">⏹</button>
-        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950">⏭</button>
+        {/* Transport buttons */}
+        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950"
+          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })}>▶</button>
+        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950"
+          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'pause' })}>⏸</button>
+        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
+          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'stop' })}>⏹</button>
+        <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-blue-400 border border-blue-400 bg-transparent hover:bg-blue-950"
+          onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'next' })}>⏭</button>
         <button type="button" onClick={() => { if (!showBrowser) loadBrowser('data/media'); setShowBrowser(!showBrowser) }}
           className={`px-2 py-1 rounded text-[10px] font-semibold border bg-transparent ${showBrowser ? 'text-orange-400 border-orange-400' : 'text-zinc-400 border-zinc-600'}`}>📁</button>
       </div>

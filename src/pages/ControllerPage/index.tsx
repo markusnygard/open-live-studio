@@ -986,7 +986,7 @@ export function ControllerPage() {
                 <SectionLabel icon={<MediaPlayerIcon />} tooltip="Media player. Browse and select clips from the media folder to build a playlist. Use transport controls to play, pause, stop and skip clips. The video and audio output is routed to the vision mixer and audio mixer as a regular source." onHide={() => togglePanel('mediaplayer')}>Media Player</SectionLabel>
                 <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-3">
                   {mediaPlayers.map((mp, i) => (
-                    <MediaPlayerCard key={mp!.id} mp={mp!} />
+                    <MediaPlayerCard key={mp!.id} mp={mp!} send={send} />
                   ))}
                 </div>
               </div>
