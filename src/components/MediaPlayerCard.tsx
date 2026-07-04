@@ -13,7 +13,7 @@ interface PlayerState {
 export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: OutboundMessage) => void }) {
   const [playerPlaylist, setPlayerPlaylist] = useState<string[]>(mp.playlist || [])
   const [showBrowser, setShowBrowser] = useState(false)
-  const [browserPath, setBrowserPath] = useState('data/media')
+  const [browserPath, setBrowserPath] = useState('host/media')
   const [browserParent, setBrowserParent] = useState<string | null>(null)
   const [browserDirs, setBrowserDirs] = useState<string[]>([])
   const [browserFiles, setBrowserFiles] = useState<string[]>([])
@@ -65,7 +65,7 @@ export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: Outbo
           <button type="button" onClick={() => { setLoopOn(!loopOn); send({ type: 'MEDIAPLAYER_TOGGLE_LOOP', sourceId: mp.id, active: !loopOn }) }}
             className={`px-2 py-1 rounded text-[10px] font-semibold border bg-transparent ${loopOn ? 'text-green-400 border-green-400' : 'text-zinc-500 border-zinc-600 hover:text-green-400'}`}
             title="Loop playlist">↺</button>
-          <button type="button" onClick={() => { if (!showBrowser) loadBrowser('data/media'); setShowBrowser(!showBrowser) }}
+          <button type="button" onClick={() => { if (!showBrowser) loadBrowser('host/media'); setShowBrowser(!showBrowser) }}
             className={`px-2 py-1 rounded text-[10px] font-semibold border bg-transparent ${showBrowser ? 'text-orange-400 border-orange-400' : 'text-zinc-400 border-zinc-600'}`}
             title="Browse files">📁</button>
         </div>
