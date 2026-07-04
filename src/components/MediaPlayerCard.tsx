@@ -92,6 +92,8 @@ export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; sen
             onClick={() => {
               if (playerPlaylist.length > 0) {
                 send({ type: 'MEDIAPLAYER_SET_PLAYLIST', sourceId: mp.id, files: playerPlaylist })
+                // Goto first file to force loading from updated playlist
+                send({ type: 'MEDIAPLAYER_GOTO', sourceId: mp.id, index: 0 })
               }
               send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })
             }}>▶</button>
