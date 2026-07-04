@@ -39,7 +39,17 @@ export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; sen
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
-  // Poll player state from backend every 250ms while production is active
+  // Software loop: when loopOn and playback reaches the end, restart
+  useEffect(() => {
+    if (!loopOn) return
+    if (playerState.state !== 'stopped') return
+    if (playerPlaylist.length === 0) return
+    const pos = playerState.positionMs
+    const dur = playerState.durationMs
+    if (dur > 0 && pos >= dur - 500) {
+      send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })
+    }
+  }, [playerState.state, playerState.positionMs, playerState.durationMs, loopOn])
   useEffect(() => {
     if (!productionId) return
     const poll = async () => {
