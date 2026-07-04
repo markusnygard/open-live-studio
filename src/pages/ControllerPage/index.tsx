@@ -983,8 +983,10 @@ export function ControllerPage() {
             )}
             {panels.mediaplayer && hasMediaPlayers && activeProduction?.status === 'active' && (
               <div className={`${panels.controller || panels.fx ? 'pr-3' : 'px-3'} flex flex-col gap-2 shrink-0 h-full overflow-hidden`} style={{ width: 360 }}>
-                <SectionLabel icon={<MediaPlayerIcon />} tooltip="Media player. Browse and select clips from the media folder to build a playlist. Use transport controls to play, pause, stop and skip clips. The video and audio output is routed to the vision mixer and audio mixer as a regular source." onHide={() => togglePanel('mediaplayer')}>Media Player</SectionLabel>
-                <div className="flex-1 overflow-y-auto min-h-0 flex flex-col gap-3">
+                <SectionLabel icon={<MediaPlayerIcon />} tooltip="Media player. Browse and select clips from the media folder to build a playlist. Use transport controls to play, pause, stop and skip clips. The video and audio output is routed to the vision mixer and audio mixer as a regular source." onPopOut={activeProductionId ? () => { window.open(`/pane/mediaplayer?production=${activeProductionId}`, '_blank', 'noopener') } : undefined} onHide={() => togglePanel('mediaplayer')}>Media Player</SectionLabel>
+                <div className="flex-1 overflow-y-auto min-h-0 grid grid-cols-2 gap-2 auto-rows-min">
+
+
                   {mediaPlayers.map((mp, i) => (
                     <MediaPlayerCard key={mp!.id} mp={mp!} send={send} />
                   ))}

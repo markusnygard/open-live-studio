@@ -59,6 +59,7 @@ export interface ApiSource {
   status: 'active' | 'inactive'
   liveCamera?: boolean
   latency?: number
+  playlist?: string[]
 }
 
 export interface ProductionSourceAssignment {
