@@ -988,7 +988,7 @@ export function ControllerPage() {
 
 
                   {mediaPlayers.map((mp, i) => (
-                    <MediaPlayerCard key={mp!.id} mp={mp!} send={send} />
+                    <MediaPlayerCard key={mp!.id} mp={mp!} send={send} productionId={activeProductionId} />
                   ))}
                 </div>
               </div>

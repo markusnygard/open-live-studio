@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { request, sourcesApi, type ApiSource } from '@/lib/api'
 import type { OutboundMessage } from '@/hooks/useControllerWs'
 
@@ -10,7 +10,7 @@ interface PlayerState {
   loopPlaylist: boolean
 }
 
-export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: OutboundMessage) => void }) {
+export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; send: (msg: OutboundMessage) => void; productionId: string | null }) {
   const [playerPlaylist, setPlayerPlaylist] = useState<string[]>(mp.playlist || [])
   const [showBrowser, setShowBrowser] = useState(false)
   const [browserPath, setBrowserPath] = useState('host/media')
@@ -20,6 +20,7 @@ export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: Outbo
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [playerState, setPlayerState] = useState<PlayerState>({ state: 'stopped', positionMs: 0, durationMs: 0, currentFileIndex: 0, loopPlaylist: false })
   const [loopOn, setLoopOn] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadBrowser = (p: string) => {
     request<{ dirs: string[]; files: string[]; path: string; parent: string | null }>(`/api/v1/recorder/dirs?path=${encodeURIComponent(p)}&files=1`)
@@ -38,6 +39,30 @@ export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: Outbo
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
+  // Poll player state from backend every 250ms while production is active
+  useEffect(() => {
+    if (!productionId) return
+    const poll = async () => {
+      try {
+        const data = await request<{ position_ns: number; duration_ns: number; current_file_index: number; total_files: number; loop_playlist: boolean; state: string }>(
+          `/api/v1/productions/${productionId}/player-state/${encodeURIComponent(mp.id)}`
+        )
+        if (data) {
+          setPlayerState({
+            state: (data.state === 'playing' || data.state === 'paused' || data.state === 'stopped') ? data.state : 'stopped',
+            positionMs: Math.floor((data.position_ns || 0) / 1_000_000),
+            durationMs: Math.floor((data.duration_ns || 0) / 1_000_000),
+            currentFileIndex: data.current_file_index ?? 0,
+            loopPlaylist: data.loop_playlist ?? false,
+          })
+        }
+      } catch {}
+    }
+    poll()
+    pollRef.current = setInterval(poll, 250)
+    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+  }, [productionId, mp.id])
+
   return (
     <div className="bg-[#0b0f14] border border-zinc-800 rounded p-2 text-[11px]">
       {/* Header with name + status dot */}
@@ -53,7 +78,13 @@ export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: Outbo
       <div className="flex items-center gap-1 mb-2">
         <div className="flex gap-1">
           <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-green-400 border border-green-400 bg-transparent hover:bg-green-950"
-            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })}>▶</button>
+            onClick={() => {
+              // Always sync playlist before playing
+              if (playerPlaylist.length > 0) {
+                send({ type: 'MEDIAPLAYER_SET_PLAYLIST', sourceId: mp.id, files: playerPlaylist })
+              }
+              send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })
+            }}>▶</button>
           <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border border-amber-400 bg-transparent hover:bg-amber-950"
             onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'pause' })}>⏸</button>
           <button type="button" className="px-2 py-1 rounded text-[10px] font-semibold text-red-400 border border-red-400 bg-transparent hover:bg-red-950"
@@ -103,6 +134,8 @@ export function MediaPlayerCard({ mp, send }: { mp: ApiSource; send: (msg: Outbo
                 setSelectedFiles(new Set())
                 setShowBrowser(false)
                 sourcesApi.update(mp.id, { playlist: newList } as any).catch(() => {})
+                // Sync playlist to Strom player
+                send({ type: 'MEDIAPLAYER_SET_PLAYLIST', sourceId: mp.id, files: newList })
               }}>Add {selectedFiles.size} clips to playlist</button>
           )}
         </div>

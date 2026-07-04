@@ -45,6 +45,7 @@ export type OutboundMessage =
   | { type: 'MEDIAPLAYER_SEEK'; sourceId: string; positionMs: number }
   | { type: 'MEDIAPLAYER_GOTO'; sourceId: string; index: number }
   | { type: 'MEDIAPLAYER_TOGGLE_LOOP'; sourceId: string; active: boolean }
+  | { type: 'MEDIAPLAYER_SET_PLAYLIST'; sourceId: string; files: string[] }
 
 /**
  * Opens a WebSocket connection to /ws/productions/:id/controller.
