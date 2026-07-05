@@ -28,6 +28,7 @@ export type OutboundMessage =
   | { type: 'AFV_RAMP_SET'; rampUpMs: number; rampDownMs: number }
   | { type: 'PFL_SET'; elementId: string; enabled: boolean; volume?: number }
   | { type: 'AFL_SET'; elementId: string; enabled: boolean }
+  | { type: 'AUDIO_DYNAMICS_SET'; channel: number; property: string; value: number | boolean }
   | { type: 'AUX_SEND_SET'; elementId: string; auxBus: number; level: number; enabled: boolean; pre?: boolean }
   | { type: 'AUX_MASTER_SET'; auxBus: number; volume: number; muted: boolean }
   | { type: 'GRP_SEND_SET'; elementId: string; grpBus: number; level: number; enabled: boolean }
@@ -76,6 +77,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
   const resetGrpState          = useAudioStore((s) => s.resetGrpState)
   const applyMeter             = useAudioStore((s) => s.applyMeter)
   const applyLoudness          = useAudioStore((s) => s.applyLoudness)
+  const applyDynamics          = useAudioStore((s) => s.applyDynamics)
   const applySourceOffset      = useProductionStore((s) => s.applySourceOffset)
   const applySourceAudioOffset = useProductionStore((s) => s.applySourceAudioOffset)
   const resetSourceOffsets     = useProductionStore((s) => s.resetSourceOffsets)
@@ -92,7 +94,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyPfl, applyAfl,
     applyAuxSend, applyAuxSendPre, applyAuxMaster,
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
-    applyMeter, applyLoudness,
+    applyMeter, applyLoudness, applyDynamics,
     applySourceOffset, applySourceAudioOffset, resetSourceOffsets, applyAfvRamp,
     applyPipState, applyFxState, setDeactivatedExternally, addToast, markInactive,
   })
@@ -102,7 +104,7 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
     applyPfl, applyAfl,
     applyAuxSend, applyAuxSendPre, applyAuxMaster,
     applyGrpSend, applyGrpMaster, applyMonitorMaster, resetGrpState,
-    applyMeter, applyLoudness,
+    applyMeter, applyLoudness, applyDynamics,
     applySourceOffset, applySourceAudioOffset, resetSourceOffsets, applyAfvRamp,
     applyPipState, applyFxState, setDeactivatedExternally, addToast, markInactive,
   }
@@ -167,6 +169,12 @@ export function useControllerWs(productionId: string | null): (msg: OutboundMess
             case 'AFL_STATE': {
               if (typeof msg['elementId'] === 'string' && typeof msg['enabled'] === 'boolean') {
                 a.applyAfl(msg['elementId'] as string, msg['enabled'] as boolean)
+              }
+              break
+            }
+            case 'AUDIO_DYNAMICS_STATE': {
+              if (typeof msg['channel'] === 'number' && typeof msg['property'] === 'string') {
+                a.applyDynamics(msg['channel'] as number, msg['property'] as string, msg['value'] as number | boolean)
               }
               break
             }

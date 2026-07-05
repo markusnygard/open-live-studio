@@ -33,6 +33,7 @@ interface AudioState {
   grpMasterLevel: Record<number, number>               // grpBus(1-indexed) → fader level (0–10); 1.0 = 0 dB default
   grpMasterMuted: Record<number, boolean>              // grpBus(1-indexed) → master muted (output silenced)
   meters: Record<string, MeterReading>                 // elementId → peak/rms in dB
+  dynamics: Record<string, number | boolean>            // `chN_property` → value (gain, pan, gate, comp, eq, etc.)
   pendingAfvByMixerInput: Record<string, boolean>      // mixerInput → AFV queued before elements loaded
   productionId: string | null
 }
@@ -69,6 +70,8 @@ interface AudioActions {
   applyGrpMaster: (grpBus: number, volume: number, muted: boolean) => void
   applyMeter: (elementId: string, peak: number[], rms: number[]) => void
   applyLoudness: (elementId: string, lufs_m: number, lufs_s: number | null, lufs_i: number | null, true_peak: number[]) => void
+  /** Server-authoritative dynamics setter (gain, pan, gate, comp, eq properties). */
+  applyDynamics: (channel: number, property: string, value: number | boolean) => void
   // Optimistic local-only updates called by the UI before sending via WS
   setLevel: (elementId: string, value: number) => void
   /** Update the fader level for an aux send (does not change enabled state). */
@@ -123,6 +126,7 @@ export const useAudioStore = create<AudioState & AudioActions>()(
       grpMasterLevel: {},
       grpMasterMuted: {},
       meters: {},
+      dynamics: {},
       pendingAfvByMixerInput: {},
       productionId: null,
 
@@ -216,6 +220,9 @@ export const useAudioStore = create<AudioState & AudioActions>()(
             true_peak,
           }
         }),
+
+      applyDynamics: (channel, property, value) =>
+        _set((s) => { s.dynamics[`ch${channel}_${property}`] = value }),
 
       setLevel: (elementId, value) =>
         _set((s) => { s.levels[elementId] = Math.max(0, Math.min(10, value)) }),

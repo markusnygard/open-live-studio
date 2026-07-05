@@ -3,6 +3,7 @@ import { useAudioStore } from '@/store/audio.store'
 import { useProductionStore } from '@/store/production.store'
 import { cn } from '@/lib/cn'
 import type { OutboundMessage } from '@/hooks/useControllerWs'
+import { ProcessingPopup } from '@/components/ProcessingPopup'
 
 // ── EBU R128 Meter ────────────────────────────────────────────────────────────
 // Displays momentary LUFS bar + integrated LUFS readout + latching True Peak indicator.
@@ -269,7 +270,7 @@ const EMPTY_RECORD: Record<number, boolean> = {}
 
 // ── Channel strip ─────────────────────────────────────────────────────────────
 
-function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false, showAfl = false, showEbu = false, mixerInput = null, isPgm = false, isPvw = false, busColor = C_MAIN, grpBuses = [] }: {
+function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false, showAfl = false, showEbu = false, mixerInput = null, isPgm = false, isPvw = false, busColor = C_MAIN, grpBuses = [], chNum = 0 }: {
   elementId: string
   label: string
   send: SendFn
@@ -284,6 +285,8 @@ function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false
   busColor?: typeof C_MAIN
   /** Group buses to show assign buttons for (e.g. [1, 2]) */
   grpBuses?: number[]
+  /** Channel number (1-indexed) for dynamics processing */
+  chNum?: number
 }) {
   const level = useAudioStore((s) => s.levels[elementId] ?? 1.0)
   const muted = useAudioStore((s) => s.muted[elementId] ?? false)
@@ -300,6 +303,15 @@ function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false
   const truePeak        = useAudioStore((s) => showEbu ? s.meters[elementId]?.true_peak : undefined)
   const tpLatch         = showEbu && (truePeak?.length ?? 0) > 0 && truePeak!.some((tp) => tp > TP_THRESHOLD)
   const handleLoudnessReset = useCallback(() => { send({ type: 'LOUDNESS_RESET' }) }, [send])
+  const dynamics         = useAudioStore((s) => s.dynamics)
+  const [showProcessing, setShowProcessing] = useState(false)
+
+  const key = (prop: string) => dynamics[`ch${chNum}_${prop}`]
+  const hpfOn = (key('hpf_enabled') as boolean) ?? false
+  const gateOn = (key('gate_enabled') as boolean) ?? false
+  const compOn = (key('comp_enabled') as boolean) ?? false
+  const eqOn = (key('eq_enabled') as boolean) ?? false
+  const panVal = (key('pan') as number) ?? 0
 
   // Derived 3-state mode: afv wins if set, otherwise on/off from mute flag
   const mode: 'off' | 'on' | 'afv' = afv ? 'afv' : muted ? 'off' : 'on'
@@ -440,6 +452,20 @@ function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false
           {label}
         </span>
       </div>
+
+      {/* H/G/C/E buttons — toggle processing sections, click to open detail popup */}
+      {chNum > 0 && (
+        <div className="flex gap-[1px] justify-center py-0.5 bg-[#0a0a0a]">
+          {([['H', hpfOn, '#a855f7'], ['G', gateOn, '#22c55e'], ['C', compOn, '#f97316'], ['E', eqOn, '#3b82f6']] as [string, boolean, string][]).map(([letter, active, color]) => (
+            <button key={letter} type="button"
+              className="border-0 cursor-pointer rounded-sm w-3.5 h-3.5 flex items-center justify-center text-[7px] font-bold"
+              style={{ background: active ? color : '#27272a', color: active ? '#fff' : '#52525b' }}
+              onClick={(e) => { e.stopPropagation(); setShowProcessing(true) }}
+              title={`${letter === 'H' ? 'High-Pass Filter' : letter === 'G' ? 'Gate' : letter === 'C' ? 'Compressor' : 'EQ'}${active ? ' (active)' : ''}`}
+            >{letter}</button>
+          ))}
+        </div>
+      )}
 
       {/* Main body */}
       <div className="flex flex-1 pb-2">
@@ -598,7 +624,26 @@ function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false
             </button>
           )}
         </div>
+
+        {/* Pan slider — shown for input channels */}
+        {chNum > 0 && (
+          <div className="flex flex-col items-center gap-0.5 py-1 bg-[#0a0a0a]">
+            <span className="text-[7px] text-zinc-500 leading-none">PAN</span>
+            <div className="flex items-center gap-1 w-full px-1">
+              <span className="text-[7px] text-zinc-600 w-3 text-right">L</span>
+              <input type="range" min={-1} max={1} step={0.02} value={panVal}
+                className="flex-1 h-1 accent-blue-500 cursor-pointer"
+                onChange={(e) => send({ type: 'AUDIO_DYNAMICS_SET', channel: chNum, property: 'pan', value: parseFloat(e.target.value) })} />
+              <span className="text-[7px] text-zinc-600 w-3">R</span>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Processing popup */}
+      {showProcessing && (
+        <ProcessingPopup chNum={chNum} channelName={label} send={send} onClose={() => setShowProcessing(false)} />
+      )}
     </div>
   )
 }
@@ -1298,6 +1343,7 @@ export function AudioPanel({ send, numAuxBuses = 2, numGroups = 2, showEbuMain =
                           isPvw={!!pvwInput && el.mixerInput === pvwInput}
                           busColor={C_IN}
                           grpBuses={grpBuses}
+                          chNum={parseInt((el.elementId as string).replace('ch', ''), 10) || 0}
                         />
                       ))
                     )}
