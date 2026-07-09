@@ -133,31 +133,37 @@ export function OutputsPanel() {
   const [newName, setNewName] = useState('')
   const [newType, setNewType] = useState<OutputType>('mpegtssrt')
   const [newUrl, setNewUrl] = useState('srt://:43524?mode=listener')
+  const [newLatency, setNewLatency] = useState(125)
+  const [newProdId, setNewProdId] = useState('')
   const [newOutputDir, setNewOutputDir] = useState('recordings')
   const [newContainer, setNewContainer] = useState('mp4')
   const [newAudioSource, setNewAudioSource] = useState('pgm')
   const [newVideoSource, setNewVideoSource] = useState('pgm')
   const [recorderProdId, setRecorderProdId] = useState('')
-  const [recorderSources, setRecorderSources] = useState<Array<{ sourceId: string; mixerInput: string; name: string }>>([])
+  const [sourceProdId, setSourceProdId] = useState('')
+  const [sourceList, setSourceList] = useState<Array<{ sourceId: string; mixerInput: string; name: string }>>([])
   const [dirPickerOpen, setDirPickerOpen] = useState(false)
 
-  // Fetch production sources when a production is selected for recorder
+  // Fetch production sources when a production is selected for source dropdown
   useEffect(() => {
-    if (!recorderProdId) { setRecorderSources([]); return }
-    productionsApi.get(recorderProdId).then((prod) => {
+    if (!sourceProdId) { setSourceList([]); return }
+    productionsApi.get(sourceProdId).then((prod) => {
       const assignments = prod.sources ?? []
       const named = assignments.map((a) => {
         const src = sources.find((s) => s.id === a.sourceId)
-        return { sourceId: a.sourceId, mixerInput: a.mixerInput, name: src?.name ?? a.mixerInput }
+        return { ...a, name: src?.name ?? a.mixerInput }
       })
-      setRecorderSources(named)
-    }).catch(() => setRecorderSources([]))
-  }, [recorderProdId, sources])
+      setSourceList(named)
+    }).catch(() => setSourceList([]))
+  }, [sourceProdId, sources])
 
   function resetAdd() {
     setNewName('')
     setNewType('mpegtssrt')
     setNewUrl('srt://:43524?mode=listener')
+    setNewLatency(125)
+    setNewProdId('')
+    setSourceProdId('')
     setNewOutputDir('recordings')
     setNewContainer('mp4')
     setNewAudioSource('pgm')
@@ -188,14 +194,21 @@ export function OutputsPanel() {
       if (duplicate) { setAddUrlError(`Address already used by "${duplicate.name}"`); return }
     }
     const url = typeNeedsUrl(newType) ? newUrl.trim() : typeNeedsDevice(newType) ? (newUrl.trim() || '0') : undefined
-    const body: Record<string, unknown> = { name: newName.trim(), outputType: newType, url }
+    const body: Record<string, unknown> = { name: newName.trim(), outputType: newType, url, videoSource: newVideoSource, audioSource: newAudioSource }
+    if (newType === 'mpegtssrt' || newType === 'efpsrt') {
+      body.latency = newLatency
+    }
     if (newType === 'recorder') {
       body.outputDir = newOutputDir
       body.container = newContainer
       body.audioSource = newAudioSource
       body.videoSource = newVideoSource
     }
-    await addOutput(body as { name: string; outputType: OutputType; url?: string; outputDir?: string; container?: string; audioSource?: string; videoSource?: string })
+    const created = await addOutput(body as { name: string; outputType: OutputType; url?: string; outputDir?: string; container?: string; audioSource?: string; videoSource?: string })
+    // Auto-link to selected production
+    if (newProdId && created?.id) {
+      productionsApi.assignOutput(newProdId, created.id).catch(() => {})
+    }
     resetAdd()
     setAddOpen(false)
   }
@@ -363,6 +376,30 @@ export function OutputsPanel() {
             {addUrlError && <p className="text-xs text-red-400 mt-1">{addUrlError}</p>}
           </div>
           )}
+          {(newType === 'mpegtssrt' || newType === 'efpsrt') && (
+          <div>
+            <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Latency (ms)</label>
+            <input
+              type="number"
+              min={20}
+              max={8000}
+              step={10}
+              value={newLatency}
+              onChange={(e) => setNewLatency(parseInt(e.target.value, 10) || 125)}
+              className={inputCls + ' w-24'}
+            />
+          </div>
+          )}
+          <div>
+            <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Production</label>
+            <select value={newProdId} onChange={(e) => { setNewProdId(e.target.value); setSourceProdId(e.target.value) }}
+              className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+              <option value="">— none —</option>
+              {productions.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
           {typeNeedsDevice(newType) && (
           <div>
             <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Device Number</label>
@@ -379,6 +416,32 @@ export function OutputsPanel() {
             ) : (
             <p className="text-sm text-[--color-amber]">No DeckLink hardware detected. Connect a card to enable SDI output.</p>
             )}
+          </div>
+          )}
+          {/* Video/Audio source — shown for all output types when a production is selected */}
+          {newProdId && sourceList.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Video Source</label>
+              <select value={newVideoSource} onChange={(e) => setNewVideoSource(e.target.value)}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                <option value="pgm">PGM (Program Feed)</option>
+                <option value="pgm_clean">Clean PGM (no DSK)</option>
+                {sourceList.map((s) => (
+                  <option key={s.sourceId} value={s.sourceId}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Audio Source</label>
+              <select value={newAudioSource} onChange={(e) => setNewAudioSource(e.target.value)}
+                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
+                <option value="pgm">PGM (Program Mix)</option>
+                {sourceList.map((s) => (
+                  <option key={s.sourceId} value={s.sourceId}>{s.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           )}
           {newType === 'recorder' && (
@@ -401,7 +464,6 @@ export function OutputsPanel() {
                   className="px-3 py-2 rounded border border-[--color-border-strong] bg-[--color-surface-2] text-xs text-[--color-text-muted] hover:text-orange-500 whitespace-nowrap">Browse...</button>
               </div>
             </div>
-            {/* Dir picker — shown inline, no nested modal */}
             {dirPickerOpen && (
             <div className="border border-[--color-border-strong] rounded p-3 bg-[--color-surface-raised]">
               <div className="flex items-center justify-between mb-2">
@@ -412,34 +474,6 @@ export function OutputsPanel() {
               <DirPicker value={newOutputDir} onChange={(d) => { setNewOutputDir(d); setDirPickerOpen(false) }} onClose={() => setDirPickerOpen(false)} />
             </div>
             )}
-            <div>
-              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Video Source</label>
-              <select value={recorderProdId} onChange={(e) => { setRecorderProdId(e.target.value); setNewVideoSource('pgm') }}
-                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
-                <option value="">— select production —</option>
-                {productions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Record Source</label>
-              <select value={newVideoSource} onChange={(e) => setNewVideoSource(e.target.value)}
-                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
-                <option value="pgm">PGM (Program Feed)</option>
-                <option value="pgm_clean">Clean PGM (no DSK)</option>
-                {recorderSources.map((s) => (
-                  <option key={s.sourceId} value={s.sourceId}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-[--color-text-muted] uppercase tracking-wider block mb-1">Audio Source</label>
-              <select value={newAudioSource} onChange={(e) => setNewAudioSource(e.target.value)}
-                className="w-full px-3 py-2 rounded bg-[--color-surface-raised] border border-[--color-border-strong] text-sm text-[--color-text-primary] focus:outline-none focus:border-orange-500">
-                <option value="pgm">PGM (Program Mix)</option>
-              </select>
-            </div>
           </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
