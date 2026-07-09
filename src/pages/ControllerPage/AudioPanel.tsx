@@ -112,7 +112,7 @@ function EbuColumn({ elementId, isActive, tpLatch, onReset }: { elementId: strin
 
 type SendFn = (msg: OutboundMessage) => void
 
-const FADER_H = 260
+const FADER_H = 220
 // Width of the fader container. The range input CSS height is set to this value so that
 // after rotate(-90deg) it fills the container exactly — this is what centres the handle.
 // Must be ≥ the widest thumb (CSS height in index.css) so the handle isn't clipped.
@@ -625,19 +625,31 @@ function ChannelStrip({ elementId, label, send, showAfv = false, showPfl = false
           )}
         </div>
 
-        {/* Pan slider — shown for input channels */}
+        {/* Pan — labels row (L | PAN | R) + slider row */}
         {chNum > 0 && (
-          <div className="flex flex-col items-center gap-0.5 py-1 bg-[#0a0a0a]">
-            <span className="text-[7px] text-zinc-500 leading-none">PAN</span>
-            <div className="flex items-center gap-1 w-full px-1">
-              <span className="text-[7px] text-zinc-600 w-3 text-right">L</span>
-              <input type="range" min={-1} max={1} step={0.02} value={panVal}
-                className="flex-1 h-1 accent-blue-500 cursor-pointer"
-                onChange={(e) => send({ type: 'AUDIO_DYNAMICS_SET', channel: chNum, property: 'pan', value: parseFloat(e.target.value) })} />
-              <span className="text-[7px] text-zinc-600 w-3">R</span>
+          <div className="relative bg-[#0a0a0a] py-1 group cursor-pointer" style={{ width: STRIP_W }}>
+            {/* Labels row */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[8px] text-white font-semibold leading-none">L</span>
+              <span className="text-[7px] text-white/40 leading-none">PAN</span>
+              <span className="text-[8px] text-white font-semibold leading-none">R</span>
             </div>
+            {/* Slider row */}
+            <div className="px-1">
+              <input type="range" min={-1} max={1} step={0.02} value={panVal}
+                className="w-full h-1 accent-blue-500 cursor-pointer"
+                style={{ margin: 0 }}
+                onChange={(e) => send({ type: 'AUDIO_DYNAMICS_SET', channel: chNum, property: 'pan', value: parseFloat(e.target.value) })}
+                onDoubleClick={() => send({ type: 'AUDIO_DYNAMICS_SET', channel: chNum, property: 'pan', value: 0 })} />
+            </div>
+            {/* Value tooltip on hover */}
+            <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              <span className="text-[9px] font-bold text-orange-500 bg-black/80 px-1 rounded tabular-nums">{Math.round(panVal * 100)}</span>
+            </span>
           </div>
         )}
+
+
       </div>
 
       {/* Processing popup */}

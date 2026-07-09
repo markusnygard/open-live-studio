@@ -20,7 +20,11 @@ export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; sen
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set())
   const [playerState, setPlayerState] = useState<PlayerState>({ state: 'stopped', positionMs: 0, durationMs: 0, currentFileIndex: 0, loopPlaylist: false })
   const [loopOn, setLoopOn] = useState(false)
+  const playlistDirty = useRef(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Keep loop button state in sync with the player (loop is live in Strom)
+  useEffect(() => { setLoopOn(playerState.loopPlaylist) }, [playerState.loopPlaylist])
 
   const loadBrowser = (p: string) => {
     request<{ dirs: string[]; files: string[]; path: string; parent: string | null }>(`/api/v1/recorder/dirs?path=${encodeURIComponent(p)}&files=1`)
@@ -39,17 +43,6 @@ export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; sen
     return `${m}:${sec.toString().padStart(2, '0')}`
   }
 
-  // Software loop: when loopOn and playback reaches the end, restart
-  useEffect(() => {
-    if (!loopOn) return
-    if (playerState.state !== 'stopped') return
-    if (playerPlaylist.length === 0) return
-    const pos = playerState.positionMs
-    const dur = playerState.durationMs
-    if (dur > 0 && pos >= dur - 500) {
-      send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })
-    }
-  }, [playerState.state, playerState.positionMs, playerState.durationMs, loopOn])
   useEffect(() => {
     if (!productionId) return
     const poll = async () => {
@@ -90,16 +83,28 @@ export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; sen
           <button type="button"
             className={`px-2 py-1 rounded text-[10px] font-semibold text-green-400 border bg-transparent hover:bg-green-950 ${playerState.state === 'playing' ? 'border-green-400' : 'border-zinc-700'}`}
             onClick={() => {
-              if (playerPlaylist.length > 0) {
+              // PLAY always starts the current clip from the beginning.
+              // (Resume-from-pause is the pause button's second push.)
+              if (playlistDirty.current && playerPlaylist.length > 0) {
                 send({ type: 'MEDIAPLAYER_SET_PLAYLIST', sourceId: mp.id, files: playerPlaylist })
                 // Goto first file to force loading from updated playlist
                 send({ type: 'MEDIAPLAYER_GOTO', sourceId: mp.id, index: 0 })
+                playlistDirty.current = false
+              } else {
+                send({ type: 'MEDIAPLAYER_SEEK', sourceId: mp.id, positionMs: 0 })
               }
               send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })
             }}>▶</button>
           <button type="button"
             className={`px-2 py-1 rounded text-[10px] font-semibold text-amber-400 border bg-transparent hover:bg-amber-950 ${playerState.state === 'paused' ? 'border-amber-400' : 'border-zinc-700'}`}
-            onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'pause' })}>⏸</button>
+            onClick={() => {
+              // Toggle: second push resumes from the paused position
+              if (playerState.state === 'paused') {
+                send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'play' })
+              } else {
+                send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'pause' })
+              }
+            }}>⏸</button>
           <button type="button"
             className={`px-2 py-1 rounded text-[10px] font-semibold text-red-400 border bg-transparent hover:bg-red-950 ${playerState.state === 'stopped' ? 'border-red-400' : 'border-zinc-700'}`}
             onClick={() => send({ type: 'MEDIAPLAYER_CONTROL', sourceId: mp.id, action: 'stop' })}>⏹</button>
@@ -148,6 +153,7 @@ export function MediaPlayerCard({ mp, send, productionId }: { mp: ApiSource; sen
                 setPlayerPlaylist(newList)
                 setSelectedFiles(new Set())
                 setShowBrowser(false)
+                playlistDirty.current = true
                 sourcesApi.update(mp.id, { playlist: newList } as any).catch(() => {})
                 // Sync playlist to Strom player
                 send({ type: 'MEDIAPLAYER_SET_PLAYLIST', sourceId: mp.id, files: newList })
