@@ -223,7 +223,7 @@ export function OutputsPanel() {
     }
     const body: Record<string, string | undefined> = {
       name: editTarget.name.trim(),
-      url: isSrt ? editTarget.url.trim() || undefined : undefined,
+      url: (isSrt || editTarget.outputType === 'sdi') ? editTarget.url.trim() || undefined : undefined,
     }
     if (editTarget.outputType === 'recorder') {
       body.outputDir = editTarget.outputDir
